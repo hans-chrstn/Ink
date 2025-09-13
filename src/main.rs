@@ -5,6 +5,8 @@ use gtk4_layer_shell::*;
 use rsass::{compile_scss_path, output};
 
 const APP_ID: &str = "dev.mishima.ink";
+mod lua;
+
 fn main() {
     // Create a new application
     let app = Application::builder().application_id(APP_ID).build();
