@@ -1,21 +1,45 @@
-use std::path::Path;
+use std::{env, path::Path};
 
 use gtk4::{gdk::Display, prelude::*, style_context_add_provider_for_display, Application, ApplicationWindow, CssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION};
 use gtk4_layer_shell::*;
 use rsass::{compile_scss_path, output};
 
+use crate::lua::WidgetFramework;
+
 const APP_ID: &str = "dev.mishima.ink";
 mod lua;
 
-fn main() {
-    // Create a new application
-    let app = Application::builder().application_id(APP_ID).build();
+fn main() -> Result<(), Box<dyn std::error::Error>>{
+    gtk4::init().expect("Failed to initialize GTK");
 
-    // Connect to "activate" signal of `app`
-    app.connect_activate(build_ui);
+    let lua_framework = WidgetFramework::new("dev.hans.ink");
 
-    // Run the application
-    app.run();
+    lua_framework.register_api()?;
+
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        eprintln!("Usage: {} <widget.lua> or {} --dir <widgets_directors>", args[0], args[0]);
+        eprintln!("Example: {} examples/clock.lua", args[0]);
+        eprintln!("Example: {} --dir widgets/", args[0]);
+        std::process::exit(1);
+    }
+
+    if args[1] == "--dir" && args.len() >= 3 {
+        lua_framework.load_widget_from_dir(&args[2])?;
+    } else {
+        lua_framework.load_widget_file(&args[1])?;
+    }
+
+    if env::var("WATCH").is_ok() {
+        println!("File watching enabled. Set WATCH=1 to enable hot reload.");
+        if args.len() >= 2 && args[1] != "--dir" {
+            let file_to_watch = args[1].clone();
+            lua_framework.watch_and_reload(file_to_watch)?;
+        }
+    }
+
+    lua_framework.run();
+    Ok(())
 }
 
 pub fn load_css(path: &str) {
@@ -30,38 +54,4 @@ pub fn load_css(path: &str) {
         &provider,
         STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
-}
-
-pub fn build_ui(app: &Application) {
-    // load scss
-    load_css("src/styles/main.scss");
-
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .default_width(300)
-        .default_height(50)
-        .resizable(false)
-        .decorated(false)
-        .title("Ink")
-        .build();
-
-    window.init_layer_shell();
-
-    window.set_layer(Layer::Overlay);
-
-    window.auto_exclusive_zone_enable();
-
-    let anchors = [
-        (Edge::Left, false),
-        (Edge::Right, false),
-        (Edge::Top, true),
-        (Edge::Bottom, false),
-    ];
-
-    for (anchor, state) in anchors {
-        window.set_anchor(anchor, state);
-    }
-
-    // Present window
-    window.present();
 }
