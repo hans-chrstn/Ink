@@ -1,19 +1,37 @@
-use std::path::Path;
+use std::{env, path::Path};
 
-use gtk4::{gdk::Display, prelude::*, style_context_add_provider_for_display, Application, ApplicationWindow, CssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION};
-use gtk4_layer_shell::*;
+use gtk4::{gdk::Display, style_context_add_provider_for_display, CssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION};
 use rsass::{compile_scss_path, output};
 
+use crate::lua::WidgetFramework;
+
 const APP_ID: &str = "dev.mishima.ink";
-fn main() {
-    // Create a new application
-    let app = Application::builder().application_id(APP_ID).build();
+mod lua;
 
-    // Connect to "activate" signal of `app`
-    app.connect_activate(build_ui);
+fn main() -> Result<(), Box<dyn std::error::Error>>{
+    gtk4::init().expect("Failed to initialize GTK");
 
-    // Run the application
-    app.run();
+    let lua_framework = WidgetFramework::new(APP_ID);
+
+    lua_framework.register_api()?;
+
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        eprintln!("Usage: {} <widget.lua> or {} --dir <widgets_directors>", args[0], args[0]);
+        eprintln!("Example: {} examples/clock.lua", args[0]);
+        eprintln!("Example: {} --dir widgets/", args[0]);
+        std::process::exit(1);
+    }
+
+    let file_to_load = if args[1] == "--dir" && args.len() >= 3 {
+        Some(args[2].clone())
+    } else {
+        Some(args[1].clone())
+    };
+
+
+    lua_framework.run(file_to_load);
+    Ok(())
 }
 
 pub fn load_css(path: &str) {
@@ -28,38 +46,4 @@ pub fn load_css(path: &str) {
         &provider,
         STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
-}
-
-pub fn build_ui(app: &Application) {
-    // load scss
-    load_css("src/styles/main.scss");
-
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .default_width(300)
-        .default_height(50)
-        .resizable(false)
-        .decorated(false)
-        .title("Ink")
-        .build();
-
-    window.init_layer_shell();
-
-    window.set_layer(Layer::Overlay);
-
-    window.auto_exclusive_zone_enable();
-
-    let anchors = [
-        (Edge::Left, false),
-        (Edge::Right, false),
-        (Edge::Top, true),
-        (Edge::Bottom, false),
-    ];
-
-    for (anchor, state) in anchors {
-        window.set_anchor(anchor, state);
-    }
-
-    // Present window
-    window.present();
 }

@@ -4,10 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-gtk4 = { version = "0.9.7", package = "gtk4"}
-gtk4-layer-shell = "0.5.0"
-glib = "0.20.12"
-gio = "0.20.12"
-cairo-rs = "0.20.12"
-pango = "0.20.12"
+gtk4 = { version = "0.10.0", package = "gtk4"}
+gtk4-layer-shell = "0.6.3"
+glib = "0.21.1"
+gio = "0.21.1"
+cairo-rs = "0.21.1"
+pango = "0.21.1"
 rsass = "0.29.2"
+mlua = { version = "0.11.3", features = ["luajit"] }
+notify = "8.1.0"
