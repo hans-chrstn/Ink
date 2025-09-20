@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use gtk4::prelude::*;
 use gtk4::{glib, Application};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
-use mlua::{Lua, Result as LuaResult, Table, Function, Value};
+use mlua::{AnyUserData, Lua, Result as LuaResult, Table, Value};
 
 use crate::lua::widget::GtkWidget;
 use crate::lua::util;
@@ -37,8 +39,7 @@ fn create_gtk_widget(type_name: String, properties: Option<Table>) -> LuaResult<
         .ok_or_else(|| mlua::Error::RuntimeError(format!("Unknown widget type: {}", type_name)))?;
 
     // Create the object of the correct type
-    let object = glib::Object::with_type(gtype, &[])
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create {}: {}", type_name, e)))?;
+    let object = glib::Object::with_type(gtype);
 
     // Make sure it's actually a widget
     let widget = object.downcast::<gtk4::Widget>()
@@ -47,15 +48,13 @@ fn create_gtk_widget(type_name: String, properties: Option<Table>) -> LuaResult<
     // Set properties if provided
     if let Some(props) = properties {
         for pair in props.pairs::<String, Value>() {
-            let (key, value) = pair?;
-            
+            let (key, value) = pair?; // propagates LuaResult error
             let gvalue = util::lua_value_to_gvalue(value)?;
 
-            if let Err(e) = widget.set_property(&key, &gvalue) {
-                eprintln!("Failed to set property {} on {}: {}", key, type_name, e);
-            }
+            widget.set_property(&key, &gvalue);
         }
     }
+
 
     Ok(GtkWidget::new(widget))
 }
@@ -78,12 +77,15 @@ fn create_gtk_widget_table(lua: &Lua, app: &Application) -> LuaResult<Table> {
     ];
 
     for widget_type in widget_types {
-        let type_name = widget_type.to_string();
+        let type_name = Arc::new(widget_type.to_string());
         let short_name = type_name.strip_prefix("Gtk").unwrap_or(&type_name);
         
-        let constructor = lua.create_function(move |_, props: Option<Table>| {
-            create_gtk_widget(type_name.clone(), props)
-        })?;
+        let constructor = {
+            let type_name = Arc::clone(&type_name);
+            lua.create_function(move |_, props: Option<Table>| {
+                create_gtk_widget((*type_name).clone(), props)
+            })?
+        };
         
         gtk_table.set(short_name, constructor)?;
     }
@@ -101,9 +103,7 @@ fn create_gtk_widget_table(lua: &Lua, app: &Application) -> LuaResult<Table> {
                 
                 let gvalue = util::lua_value_to_gvalue(value)?;
 
-                if let Err(e) = window.set_property(&key, &gvalue) {
-                    eprintln!("Failed to set property {} on ApplicationWindow: {}", key, e);
-                }
+                window.set_property(&key, &gvalue);
             }
         }
 
@@ -119,7 +119,8 @@ fn create_gtk_widget_table(lua: &Lua, app: &Application) -> LuaResult<Table> {
 fn create_layer_shell_table(lua: &Lua) -> LuaResult<Table> {
     let layer_shell = lua.create_table()?;
     
-    layer_shell.set("init", lua.create_function(|_, widget: GtkWidget| {
+    layer_shell.set("init", lua.create_function(|_, widget_userdata: AnyUserData| {
+        let widget = widget_userdata.borrow::<GtkWidget>()?;
         if let Some(window) = widget.widget.downcast_ref::<gtk4::ApplicationWindow>() {
             window.init_layer_shell();
         } else if let Some(window) = widget.widget.downcast_ref::<gtk4::Window>() {
@@ -128,7 +129,9 @@ fn create_layer_shell_table(lua: &Lua) -> LuaResult<Table> {
         Ok(())
     })?)?;
 
-    layer_shell.set("set_layer", lua.create_function(|_, (widget, layer): (GtkWidget, String)| {
+    layer_shell.set("set_layer", lua.create_function(|_, (widget_userdata, layer): (AnyUserData, String)| {
+        let widget = widget_userdata.borrow::<GtkWidget>()?;
+
         let layer_value = match layer.as_str() {
             "background" => Layer::Background,
             "bottom" => Layer::Bottom,
@@ -145,14 +148,14 @@ fn create_layer_shell_table(lua: &Lua) -> LuaResult<Table> {
         Ok(())
     })?)?;
 
-    layer_shell.set("set_anchor", lua.create_function(|_, (widget, edges): (GtkWidget, Vec<String>)| {
-        let set_anchors = |window: &dyn LayerShell| {
-            // Clear all anchors first
+    layer_shell.set("set_anchor", lua.create_function(|_, (widget_userdata, edges): (AnyUserData, Vec<String>)| {
+        let widget = widget_userdata.borrow::<GtkWidget>()?;
+
+        fn apply_anchors<W: LayerShell>(window: &W, edges: &[String]) {
             for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
                 window.set_anchor(edge, false);
             }
-           
-            // Set specified anchors
+
             for edge_str in edges {
                 let edge = match edge_str.as_str() {
                     "top" => Some(Edge::Top),
@@ -161,17 +164,20 @@ fn create_layer_shell_table(lua: &Lua) -> LuaResult<Table> {
                     "right" => Some(Edge::Right),
                     _ => None,
                 };
+
                 if let Some(e) = edge {
                     window.set_anchor(e, true);
                 }
             }
-        };
+        }
 
         if let Some(window) = widget.widget.downcast_ref::<gtk4::ApplicationWindow>() {
-            set_anchors(window);
+            apply_anchors(window, &edges);
         } else if let Some(window) = widget.widget.downcast_ref::<gtk4::Window>() {
-            set_anchors(window);
+            apply_anchors(window, &edges);
         }
+
+        
         Ok(())
     })?)?;
 

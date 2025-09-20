@@ -1,6 +1,6 @@
 
 use gtk4::{prelude::*, Widget, glib};
-use mlua::{UserData, UserDataMethods, Value, Function, AnyUserData};
+use mlua::{AnyUserData, Function, UserData, UserDataMethods, Value};
 
 use crate::lua::util;
 
