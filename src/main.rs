@@ -1,6 +1,5 @@
 use gtk4::{
-    CssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION,
-    gdk::Display,
+    CssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION, gdk::Display,
     style_context_add_provider_for_display,
 };
 use rsass::{compile_scss_path, output};
