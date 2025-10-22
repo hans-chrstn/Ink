@@ -22,8 +22,8 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           components: clippy, rustfmt
 
-      - name: Install system deps 
-        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev libssl-dev
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev libssl-dev libglib2.0-dev pkg-config
 
       - uses: Swatinem/rust-cache@v2
 
