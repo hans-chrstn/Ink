@@ -1,0 +1,43 @@
+name: Clean Old Caches
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 12 */2 * *" # Runs every other day at 12
+
+permissions:
+  actions: write
+jobs:
+  delete-old-caches:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install GitHub CLI & jq
+        run: |
+          sudo apt update
+          sudo apt install -y gh jq
+
+      - name: Authenticate GitHub CLI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh auth login --with-token < $GH_TOKEN
+
+      - name: Delete old caches, keep last 3
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get all cache IDs sorted by lastUsedAt descending
+          CACHE_IDS=($(gh cache list --repo "${{ github.repository }}" --json id,lastUsedAt \
+            | jq -r '. | sort_by(.lastUsedAt) | reverse | .[].id'))
+
+          # Keep last 3
+          TO_KEEP=("${CACHE_IDS[@]:0:3}")
+          TO_DELETE=("${CACHE_IDS[@]:3}")
+
+          echo "Keeping caches: ${TO_KEEP[*]}"
+          echo "Deleting caches: ${TO_DELETE[*]}"
+
+          # Delete older caches
+          for id in "${TO_DELETE[@]}"; do
+            gh cache delete --repo "${{ github.repository }}" "$id"
+          done

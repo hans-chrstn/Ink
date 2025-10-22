@@ -1,6 +1,9 @@
 use std::path::Path;
 
-use gtk4::{gdk::Display, prelude::*, style_context_add_provider_for_display, Application, ApplicationWindow, CssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION};
+use gtk4::{
+    Application, ApplicationWindow, CssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION, gdk::Display,
+    prelude::*, style_context_add_provider_for_display,
+};
 use gtk4_layer_shell::*;
 use rsass::{compile_scss_path, output};
 
@@ -18,7 +21,8 @@ fn main() {
 
 pub fn load_css(path: &str) {
     let path = Path::new(path);
-    let css_bytes = compile_scss_path(path, output::Format::default()).expect("SCSS Compilation failed");
+    let css_bytes =
+        compile_scss_path(path, output::Format::default()).expect("SCSS Compilation failed");
     let css_str = std::str::from_utf8(&css_bytes).expect("Compiled CSS is not a valid UTF-8");
     let provider = CssProvider::new();
     provider.load_from_data(css_str);
