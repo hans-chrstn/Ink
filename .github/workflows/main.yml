@@ -20,7 +20,7 @@ jobs:
       - name: Install base deps
         run: |
           apt-get update
-          apt-get install -y curl git sudo
+          apt-get install -y curl git sudo pkg-config build-essential
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -28,7 +28,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Install system deps
-        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev libssl-dev pkg-config libgtk-4-dev libgtk4-layer-shell-dev
+        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev libssl-dev libgtk-4-dev libgtk4-layer-shell-dev
 
       - uses: Swatinem/rust-cache@v2
 
