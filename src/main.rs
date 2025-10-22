@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 use crate::{app::App, config::Config};
->>>>>>> 24d3837 ((fix): updated HEAD to latest commit (main))
 use gtk4::{
     CssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION, gdk::Display,
     style_context_add_provider_for_display,
@@ -9,11 +6,6 @@ use gtk4::{
 use rsass::{compile_scss_path, output};
 use std::path::Path;
 
-<<<<<<< HEAD
-use crate::{app::App, config::Config};
-
-=======
->>>>>>> 24d3837 ((fix): updated HEAD to latest commit (main))
 mod app;
 mod config;
 mod error;
