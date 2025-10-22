@@ -20,6 +20,7 @@ pub fn build_from_file(
     let root_table: Table = lua.load(&lua_code).call(())?;
     let root_widget = create_widget(app, lua, root_table)?;
 
+    #[allow(clippy::collapsible_if)]
     if !config.windowed {
         if let Ok(window) = root_widget.clone().downcast::<ApplicationWindow>() {
             init_layer_shell(&window);

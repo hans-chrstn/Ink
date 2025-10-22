@@ -36,7 +36,7 @@ impl App {
         let config = self.config.clone();
 
         self.app.connect_open(move |app, files, _| {
-            if let Some(file) = files.get(0) {
+            if let Some(file) = files.first() {
                 let file_path = file.path().expect("Couldn't get file path");
                 match ui::build_from_file(app, &lua, file_path.to_str().unwrap(), &config) {
                     Ok(_) => (),

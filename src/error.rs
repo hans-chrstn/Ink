@@ -3,6 +3,7 @@ use std::{
     io,
 };
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum Error {
     Lua(mlua::Error),
@@ -47,4 +48,5 @@ impl From<io::Error> for Error {
     }
 }
 
+#[allow(dead_code)]
 pub type Result<T> = std::result::Result<T, Error>;
