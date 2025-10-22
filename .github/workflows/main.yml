@@ -17,8 +17,11 @@ jobs:
           - beta
           - nightly
     steps:
+      - name: Install base deps
+        run: |
+          apt-get update
+          apt-get install -y curl git sudo
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
