@@ -1,5 +1,7 @@
 use gtk4::{
-    glib::{object::ObjectExt, value::ToValue, Object, Type, Value}, prelude::*, Application, ApplicationWindow, Box, Widget
+    Application, ApplicationWindow, Box, Widget,
+    glib::{Object, Type, Value, object::ObjectExt, value::ToValue},
+    prelude::*,
 };
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 use mlua::{Lua, Result, Table, Value as LuaValue};
@@ -8,7 +10,12 @@ use std::rc::Rc;
 
 use crate::config::Config;
 
-pub fn build_from_file(app: &Application, lua: &Rc<Lua>, file_path: &str, config: &Config) -> Result<()> {
+pub fn build_from_file(
+    app: &Application,
+    lua: &Rc<Lua>,
+    file_path: &str,
+    config: &Config,
+) -> Result<()> {
     let lua_code = fs::read_to_string(file_path)?;
     let root_table: Table = lua.load(&lua_code).call(())?;
     let root_widget = create_widget(app, lua, root_table)?;
@@ -30,10 +37,12 @@ pub fn build_from_file(app: &Application, lua: &Rc<Lua>, file_path: &str, config
 
 fn create_widget(app: &Application, lua: &Rc<Lua>, widget_table: Table) -> Result<gtk4::Widget> {
     let type_name: String = widget_table.get("type")?;
-    let props: Table = widget_table.get("properties").unwrap_or(lua.create_table()?);
+    let props: Table = widget_table
+        .get("properties")
+        .unwrap_or(lua.create_table()?);
 
-    let widget_type = Type::from_name(&type_name)
-        .unwrap_or_else(|| panic!("Unknown widget type: {}", type_name));
+    let widget_type =
+        Type::from_name(&type_name).unwrap_or_else(|| panic!("Unknown widget type: {}", type_name));
 
     let widget_object = Object::with_type(widget_type);
 

@@ -1,4 +1,7 @@
-use std::{fmt::{self, Display}, io};
+use std::{
+    fmt::{self, Display},
+    io,
+};
 
 #[derive(Debug)]
 pub enum Error {
@@ -13,7 +16,10 @@ impl Display for Error {
             Error::Lua(e) => write!(f, "Lua error: {}", e),
             Error::Io(e) => write!(f, "I/O error: {}", e),
             Error::RootNotWindow => {
-                write!(f, "The root widget in the lua file must be a GtkApplicationWindow")
+                write!(
+                    f,
+                    "The root widget in the lua file must be a GtkApplicationWindow"
+                )
             }
         }
     }

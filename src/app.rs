@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
 use gio::ApplicationFlags;
-use gtk4::{prelude::*, Application};
+use gtk4::{Application, prelude::*};
 use mlua::Lua;
 
-use crate::{register, ui, Config};
+use crate::{Config, register, ui};
 
 const APP_ID: &str = "dev.hans.ink";
 
