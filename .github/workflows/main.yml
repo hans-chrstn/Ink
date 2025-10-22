@@ -23,7 +23,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Install system deps
-        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev libssl-dev pkg-config libgtk-4-dev
+        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev libssl-dev pkg-config libgtk-4-dev libgtk4-layer-shell-dev
 
       - uses: Swatinem/rust-cache@v2
 
