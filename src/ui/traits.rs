@@ -45,8 +45,22 @@ impl_set_child!(
     gtk4::Popover,
     gtk4::Button,
     gtk4::ToggleButton,
-    gtk4::LinkButton
+    gtk4::LinkButton,
+    gtk4::Revealer,
+    gtk4::WindowHandle
 );
+
+impl WidgetContainer for gtk4::ListBox {
+    fn add_child(&self, child: &gtk4::Widget) {
+        self.append(child);
+    }
+}
+
+impl WidgetContainer for gtk4::FlowBox {
+    fn add_child(&self, child: &gtk4::Widget) {
+        self.insert(child, -1); // -1 means append
+    }
+}
 
 impl WidgetContainer for gtk4::MenuButton {
     fn add_child(&self, child: &Widget) {

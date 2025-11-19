@@ -31,6 +31,10 @@ pub fn init() {
         gtk4::ToggleButton,
         gtk4::LinkButton,
         gtk4::MenuButton,
+        gtk4::ListBox,
+        gtk4::FlowBox,
+        gtk4::Revealer,
+        gtk4::WindowHandle,
     );
 
     leafs!(
@@ -64,5 +68,9 @@ pub fn init() {
         gtk4::SearchBar,
         gtk4::AppChooserButton,
         gtk4::ListView,
+        gtk4::Video,
+        gtk4::EmojiChooser,
+        gtk4::Calendar,
+        gtk4::ShortcutsShortcut,
     );
 }
