@@ -13,7 +13,7 @@ GTK4 Layer Shell framework scriptable in Lua.
 Build from source using Cargo.
 
 ```bash
-git clone <repository_url>
+git clone https://github.com/hans-chrstn/Ink.git
 cd ink
 cargo build --release
 cp target/release/ink /usr/local/bin/
@@ -85,12 +85,14 @@ return {
 ## Examples
 
 Bar (examples/bar)
-<img src="examples/bar/bar.png" width="500" />
+![Bar](examples/bar/bar.png)
+
 
 Modularize Test (examples/modularize)
-<img src="examples/modularize/page1.png" width="500" />
-<img src="examples/modularize/page2.png" width="500" />
-<img src="examples/modularize/page3.png" width="500" />
+
+![Page 1](examples/modularize/page1.png)
+![Page 2](examples/modularize/page2.png)
+![Page 3](examples/modularize/page3.png)
 
 ## Scripting API
 
