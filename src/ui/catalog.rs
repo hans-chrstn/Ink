@@ -5,6 +5,8 @@ macro_rules! leafs { ($($t:ty),* $(,)?) => { $( Registry::register_leaf::<$t>();
 macro_rules! containers { ($($t:ty),* $(,)?) => { $( Registry::register_container::<$t>(); )* }; }
 
 pub fn init() {
+    Registry::register_grid();
+
     containers!(
         gtk4::Window,
         gtk4::ApplicationWindow,
@@ -35,10 +37,11 @@ pub fn init() {
         gtk4::FlowBox,
         gtk4::Revealer,
         gtk4::WindowHandle,
+        gtk4::Popover,
+        gtk4::Viewport,
     );
 
     leafs!(
-        gtk4::Grid,
         gtk4::Fixed,
         gtk4::StackSidebar,
         gtk4::StackSwitcher,
@@ -68,9 +71,10 @@ pub fn init() {
         gtk4::SearchBar,
         gtk4::AppChooserButton,
         gtk4::ListView,
+        gtk4::GridView,
+        gtk4::ColumnView,
         gtk4::Video,
         gtk4::EmojiChooser,
-        gtk4::Calendar,
         gtk4::ShortcutsShortcut,
     );
 }

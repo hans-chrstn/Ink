@@ -2,6 +2,7 @@ mod app;
 mod core;
 mod interop;
 mod scripting;
+mod services;
 mod tools;
 mod ui;
 
@@ -10,7 +11,8 @@ use crate::core::config::{Commands, Config};
 use std::env;
 use std::path::PathBuf;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     ui::catalog::init();
 
     let config = Config::parse();

@@ -20,7 +20,7 @@ impl App {
         let app = Application::builder().application_id("dev.ink.ui").build();
         let lua = Rc::new(Lua::new());
 
-        globals::init(&lua).expect("Failed to initialize Lua globals");
+        globals::init(lua.clone()).expect("Failed to initialize Lua globals");
 
         Self {
             app,
@@ -83,7 +83,8 @@ impl App {
                         }
 
                         let wrapped = LuaWrapper(mlua::Value::Table(table));
-                        let builder = UiBuilder::<LuaWrapper>::new().register_behavior(
+
+                        let builder = UiBuilder::new().register_behavior(
                             "GtkApplicationWindow",
                             Box::new(WindowStrategy::new(windowed)),
                         );

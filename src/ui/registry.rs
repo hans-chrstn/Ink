@@ -1,10 +1,12 @@
+use crate::scripting::lua_driver::LuaWrapper;
+use crate::ui::strategy::GridStrategy;
 use crate::ui::traits::{LeafStrategy, WidgetContainer};
 use gtk4::glib::Type;
 use gtk4::prelude::*;
 use std::collections::HashMap;
 use std::sync::{OnceLock, RwLock};
 
-type StrategyFactory = Box<dyn Fn(&gtk4::Widget) -> Box<dyn WidgetContainer> + Send + Sync>;
+type StrategyFactory = Box<dyn Fn(&gtk4::Widget) -> Box<dyn WidgetContainer<LuaWrapper>> + Send + Sync>;
 
 pub struct Registry {
     types: HashMap<String, Type>,
@@ -26,13 +28,23 @@ impl Registry {
         Self::register_impl::<T>(Box::new(|_| Box::new(LeafStrategy)));
     }
 
-    pub fn register_container<T: IsA<gtk4::Widget> + StaticType + WidgetContainer + Clone>() {
+    pub fn register_container<T: IsA<gtk4::Widget> + StaticType + WidgetContainer<LuaWrapper> + Clone>() {
         Self::register_impl::<T>(Box::new(|w| {
             if let Some(obj) = w.downcast_ref::<T>() {
                 Box::new(obj.clone())
             } else {
                 Box::new(LeafStrategy)
             }
+        }));
+    }
+    
+    pub fn register_grid() {
+        Self::register_impl::<gtk4::Grid>(Box::new(|w| {
+             if let Some(grid) = w.downcast_ref::<gtk4::Grid>() {
+                 Box::new(GridStrategy::new(grid.clone()))
+             } else {
+                 Box::new(LeafStrategy)
+             }
         }));
     }
 
@@ -48,7 +60,7 @@ impl Registry {
         Self::global().read().unwrap().types.get(name).copied()
     }
 
-    pub fn get_strategy(name: &str, w: &gtk4::Widget) -> Box<dyn WidgetContainer> {
+    pub fn get_strategy(name: &str, w: &gtk4::Widget) -> Box<dyn WidgetContainer<LuaWrapper>> {
         let lock = Self::global().read().unwrap();
         if let Some(f) = lock.strategies.get(name) {
             f(w)
@@ -58,12 +70,6 @@ impl Registry {
     }
 
     pub fn get_all_types() -> Vec<Type> {
-        Self::global()
-            .read()
-            .unwrap()
-            .types
-            .values()
-            .copied()
-            .collect()
+        Self::global().read().unwrap().types.values().copied().collect()
     }
 }
