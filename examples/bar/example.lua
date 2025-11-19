@@ -3,6 +3,31 @@
 return {
 	type = "GtkApplicationWindow",
 
+	-- path to your css
+	-- css_path = "style.css",
+
+	css = [[
+        button {
+            background-color: gray;
+            color: black;
+            border-radius: 12px;
+        }
+        label {
+            font-size: 20px;
+            color: black;
+        }
+
+        .my-window {
+          background-color: white;
+          border-radius: 20px;
+          margin: 5px;
+        }
+
+        .bar {
+          padding: 5px;
+        }
+    ]],
+
 	window_mode = "layer_shell",
 	layer = "top",
 	anchors = {
@@ -31,6 +56,7 @@ return {
 				orientation = "horizontal",
 				spacing = 12,
 				hexpand = true,
+				css_classes = { "bar" },
 			},
 			children = {
 				{

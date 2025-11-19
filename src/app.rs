@@ -2,7 +2,8 @@ use crate::scripting::globals;
 use crate::scripting::lua_driver::LuaWrapper;
 use crate::ui::builder::UiBuilder;
 use crate::ui::strategy::WindowStrategy;
-use gtk4::{Application, prelude::*};
+use gtk4::gdk::Display;
+use gtk4::{Application, CssProvider, prelude::*};
 use mlua::{Lua, Table};
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -52,8 +53,36 @@ impl App {
             match lua.load(&code).call::<mlua::Value>(()) {
                 Ok(table_val) => {
                     if let mlua::Value::Table(table) = table_val {
-                        let wrapped = LuaWrapper(mlua::Value::Table(table));
+                        let load_provider = |p: &CssProvider| {
+                            if let Some(display) = Display::default() {
+                                gtk4::style_context_add_provider_for_display(
+                                    &display,
+                                    p,
+                                    gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+                                );
+                            }
+                        };
 
+                        if let Ok(rel_path) = table.get::<String>("css_path") {
+                            let mut css_file = path.parent().unwrap().to_path_buf();
+                            css_file.push(rel_path);
+
+                            if css_file.exists() {
+                                let provider = CssProvider::new();
+                                provider.load_from_path(css_file.to_str().unwrap());
+                                load_provider(&provider);
+                            } else {
+                                eprintln!("Warn: CSS file not found at {:?}", css_file);
+                            }
+                        }
+
+                        if let Ok(css_content) = table.get::<String>("css") {
+                            let provider = CssProvider::new();
+                            provider.load_from_data(&css_content);
+                            load_provider(&provider);
+                        }
+
+                        let wrapped = LuaWrapper(mlua::Value::Table(table));
                         let builder = UiBuilder::<LuaWrapper>::new().register_behavior(
                             "GtkApplicationWindow",
                             Box::new(WindowStrategy::new(windowed)),
@@ -68,7 +97,7 @@ impl App {
                             Err(e) => eprintln!("Builder Error: {}", e),
                         }
                     } else {
-                        eprintln!("Error: Lua script must return a UI Table (WidgetConfig)");
+                        eprintln!("Error: Lua script must return a UI Table");
                     }
                 }
                 Err(e) => eprintln!("Lua Execution Failed: {}", e),

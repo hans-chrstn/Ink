@@ -1,6 +1,6 @@
 use crate::scripting::traits::ScriptValue;
 use gtk4::glib::translate::*;
-use gtk4::glib::{EnumClass, Type, Value};
+use gtk4::glib::{EnumClass, StrV, Type, Value};
 use gtk4::prelude::*;
 
 pub struct GenericConverter;
@@ -19,9 +19,7 @@ impl GenericConverter {
                     if let Some(enum_val) = enum_class.value_by_nick(&s) {
                         unsafe {
                             let mut v = Value::from_type(target);
-
                             gobject_sys::g_value_set_enum(v.to_glib_none_mut().0, enum_val.value());
-
                             return Some(v);
                         }
                     }
@@ -48,6 +46,13 @@ impl GenericConverter {
             }
         }
 
+        if target == StrV::static_type() {
+            if let Some(items) = val.get_array_items() {
+                let strings: Vec<String> =
+                    items.into_iter().filter_map(|v| v.as_string()).collect();
+                return Some(strings.to_value());
+            }
+        }
         None
     }
 }

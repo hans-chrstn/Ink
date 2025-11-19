@@ -112,6 +112,29 @@ fn generate_main(path: &Path) -> std::io::Result<()> {
 ---@type WindowConfig
 return {
 	type = "GtkApplicationWindow",
+
+  -- css_path = "path-to-your-css.css",
+	css = [[
+        button {
+            background-color: gray;
+            color: black;
+            border-radius: 12px;
+        }
+        label {
+            font-size: 20px;
+            color: black;
+        }
+
+        .my-window {
+          background-color: white;
+          border-radius: 20px;
+          margin: 5px;
+        }
+
+        .bar {
+          padding: 5px;
+        }
+    ]],
 	window_mode = "layer_shell",
 	layer = "top",
 	anchors = { top = true, left = true, right = true, bottom = false },
@@ -129,12 +152,13 @@ return {
 				orientation = "horizontal",
 				spacing = cfg.spacing,
 				hexpand = true,
+        css_classes = { "bar" },
 			},
 			children = {
 				{ type = "GtkLabel", properties = { label = "<b>Ink</b> System", use_markup = true } },
 				{ 
-                    type = "GtkButton", 
-                    properties = { label = "Click Me" },
+          type = "GtkButton", 
+          properties = { label = "Click Me" },
 					signals = { clicked = function() print("Button was clicked!") end },
 				},
 				{
