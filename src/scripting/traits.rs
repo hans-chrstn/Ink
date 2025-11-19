@@ -1,4 +1,3 @@
-use gtk4::prelude::*;
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]

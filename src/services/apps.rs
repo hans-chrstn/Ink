@@ -11,7 +11,9 @@ pub fn register(lua: &Lua) -> Result<()> {
             let all_apps = AppInfo::all();
             let result = lua.create_table()?;
 
-            for (i, app) in all_apps.iter().enumerate() {
+            let mut count = 1;
+
+            for app in all_apps.iter() {
                 if !app.should_show() {
                     continue;
                 }
@@ -29,7 +31,8 @@ pub fn register(lua: &Lua) -> Result<()> {
 
                 entry.set("icon", icon_str)?;
 
-                result.set(i + 1, entry)?;
+                result.set(count, entry)?;
+                count += 1;
             }
             Ok(result)
         })?,

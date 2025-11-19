@@ -7,6 +7,12 @@ use std::rc::Rc;
 pub fn init(lua: Rc<Lua>) -> Result<()> {
     let globals = lua.globals();
 
+    let exit = lua.create_function(|_, code: Option<i32>| {
+        std::process::exit(code.unwrap_or(0));
+        Ok(())
+    })?;
+    globals.set("exit", exit)?;
+
     let exec = lua
         .create_function(|_, cmd: String| stdlib::exec(&cmd).map_err(mlua::Error::RuntimeError))?;
     globals.set("exec", exec)?;
