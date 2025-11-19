@@ -1,15 +1,14 @@
 local cfg = require("config")
-
 local apps = Apps.list()
 
 table.sort(apps, function(a, b)
 	return a.name:lower() < b.name:lower()
 end)
 
-local app_buttons = {}
+local app_grid_widget = nil
 
-for _, app in ipairs(apps) do
-	table.insert(app_buttons, {
+local function create_app_button(app)
+	return {
 		type = "GtkButton",
 		properties = {
 			valign = "start",
@@ -19,38 +18,39 @@ for _, app in ipairs(apps) do
 		children = {
 			{
 				type = "GtkBox",
-				properties = {
-					orientation = "vertical",
-					spacing = 6,
-				},
+				properties = { orientation = "vertical", spacing = 6 },
 				children = {
-					{
-						type = "GtkImage",
-						properties = {
-							icon_name = app.icon,
-							pixel_size = cfg.icon_size,
-						},
-					},
+					{ type = "GtkImage", properties = { icon_name = app.icon, pixel_size = cfg.icon_size } },
 					{
 						type = "GtkLabel",
-						properties = {
-							label = app.name,
-							wrap = true,
-							max_width_chars = 12,
-							ellipsize = "end",
-							justify = "center",
-						},
+						properties = { label = app.name, wrap = true, max_width_chars = 12, ellipsize = "end" },
 					},
 				},
 			},
 		},
 		signals = {
 			clicked = function()
-				print("🚀 Launching: " .. app.name)
-				Apps.launch(app.executable)
+				app:launch()
+				exit()
 			end,
 		},
-	})
+	}
+end
+
+local function filter_apps(text)
+	if not app_grid_widget then
+		return
+	end
+
+	app_grid_widget:remove_children()
+
+	local query = text:lower()
+	for _, app in ipairs(apps) do
+		if app.name:lower():find(query, 1, true) then
+			local btn = Widget(create_app_button(app))
+			app_grid_widget:add(btn)
+		end
+	end
 end
 
 return {
@@ -58,13 +58,20 @@ return {
 	window_mode = "layer_shell",
 	layer = "overlay",
 	anchors = { top = true, bottom = true, left = true, right = true },
-	keyboard_mode = "on_demand",
+	keyboard_mode = "exclusive",
+
+	keymaps = {
+		["Escape"] = function()
+			exit()
+		end,
+	},
 
 	css = [[
-        window { background-color: rgba(0, 0, 0, 0.8); }
+        window { background-color: rgba(0, 0, 0, 0.85); }
         button { padding: 12px; border-radius: 12px; }
-        button:hover { background-color: rgba(255, 255, 255, 0.1); }
-        label { color: white; font-size: 12px; }
+        button:hover { background-color: rgba(255, 255, 255, 0.15); }
+        label { color: white; font-weight: bold; }
+        entry { background: rgba(255,255,255,0.1); color: white; border-radius: 8px; padding: 10px; }
     ]],
 
 	children = {
@@ -77,21 +84,23 @@ return {
 				valign = "center",
 				width_request = cfg.win_width,
 				height_request = cfg.win_height,
-				margin_top = 50,
-				margin_bottom = 50,
 			},
 			children = {
 				{
 					type = "GtkSearchEntry",
-					properties = { placeholder_text = "Search applications..." },
+					properties = { placeholder_text = "Type to search..." },
+					signals = {
+						search_changed = function(self)
+							filter_apps(self:get_text())
+						end,
+						map = function(self)
+							self:grab_focus()
+						end,
+					},
 				},
 				{
 					type = "GtkScrolledWindow",
-					properties = {
-						hscrollbar_policy = "never",
-						vexpand = true,
-						min_content_height = 400,
-					},
+					properties = { hscrollbar_policy = "never", vexpand = true, min_content_height = 400 },
 					children = {
 						{
 							type = "GtkFlowBox",
@@ -104,7 +113,12 @@ return {
 								column_spacing = 20,
 								selection_mode = "none",
 							},
-							children = app_buttons,
+							signals = {
+								map = function(self)
+									app_grid_widget = self
+									filter_apps("")
+								end,
+							},
 						},
 					},
 				},

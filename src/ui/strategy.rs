@@ -20,7 +20,7 @@ impl WindowStrategy {
     }
 }
 
-impl<T: ScriptValue> WidgetBehavior<T> for WindowStrategy {
+impl<T: ScriptValue + 'static> WidgetBehavior<T> for WindowStrategy {
     fn apply(&self, widget: &Widget, data: &T) {
         let Some(window) = widget.downcast_ref::<ApplicationWindow>() else {
             return;
@@ -29,6 +29,36 @@ impl<T: ScriptValue> WidgetBehavior<T> for WindowStrategy {
         if self.force_windowed {
             window.present();
             return;
+        }
+
+        if let Some(maps) = data
+            .get_property("keymaps")
+            .and_then(|v| v.get_map_entries())
+        {
+            let controller = gtk4::EventControllerKey::new();
+            controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
+
+            let mut bindings = Vec::new();
+            for (key_str, func) in maps {
+                if let Some((keyval, mods)) = gtk4::accelerator_parse(&key_str) {
+                    bindings.push((keyval, mods, func));
+                } else {
+                    eprintln!("Warn: Invalid keybind string '{}'", key_str);
+                }
+            }
+
+            controller.connect_key_pressed(move |_, keyval, _keycode, state| {
+                for (bind_key, bind_mods, func) in &bindings {
+                    if keyval == *bind_key && state.contains(*bind_mods) {
+                        if let Err(e) = func.call(vec![]) {
+                            eprintln!("Keybind Error: {}", e);
+                        }
+                        return gtk4::glib::Propagation::Stop;
+                    }
+                }
+                gtk4::glib::Propagation::Proceed
+            });
+            window.add_controller(controller);
         }
 
         let mode = data

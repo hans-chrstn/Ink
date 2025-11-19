@@ -1,8 +1,24 @@
+use crate::scripting::lua_driver::LuaWrapper;
+use crate::ui::registry::Registry;
 use gtk4::prelude::*;
-use mlua::{UserData, UserDataMethods, Value};
+use mlua::{Error, FromLua, Lua, UserData, UserDataMethods, Value};
 
 #[derive(Clone)]
 pub struct LuaWidget(pub gtk4::Widget);
+
+impl FromLua for LuaWidget {
+    fn from_lua(value: Value, _lua: &Lua) -> mlua::Result<Self> {
+        let ud = value
+            .as_userdata()
+            .ok_or_else(|| Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "LuaWidget".to_string(),
+                message: Some("Expected a Widget object".to_string()),
+            })?;
+        let w = ud.borrow::<Self>()?;
+        Ok(w.clone())
+    }
+}
 
 impl UserData for LuaWidget {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
@@ -18,6 +34,46 @@ impl UserData for LuaWidget {
 
         methods.add_method("remove_class", |_, this, class: String| {
             this.0.remove_css_class(&class);
+            Ok(())
+        });
+
+        methods.add_method("remove_children", |_, this, ()| {
+            if let Some(flowbox) = this.0.downcast_ref::<gtk4::FlowBox>() {
+                while let Some(child) = flowbox.first_child() {
+                    flowbox.remove(&child);
+                }
+            } else {
+                let mut children = Vec::new();
+                let mut child = this.0.first_child();
+                while let Some(c) = child {
+                    children.push(c.clone());
+                    child = c.next_sibling();
+                }
+                for c in children {
+                    c.unparent();
+                }
+            }
+            Ok(())
+        });
+
+        methods.add_method("grab_focus", |_, this, ()| {
+            this.0.grab_focus();
+            Ok(())
+        });
+
+        methods.add_method("get_text", |_, this, ()| {
+            if let Some(editable) = this.0.downcast_ref::<gtk4::Editable>() {
+                return Ok(editable.text().to_string());
+            }
+            Ok("".to_string())
+        });
+
+        methods.add_method("add", |_, this, (child, props): (LuaWidget, Value)| {
+            let type_name = this.0.type_().name();
+            let strategy = Registry::get_strategy(type_name, &this.0);
+
+            let wrapper = LuaWrapper(props);
+            strategy.add_child(&child.0, &wrapper);
             Ok(())
         });
 
