@@ -1,3 +1,4 @@
+use crate::scripting::globals;
 use crate::scripting::lua_driver::LuaWrapper;
 use crate::ui::builder::UiBuilder;
 use gtk4::{Application, prelude::*};
@@ -16,6 +17,9 @@ impl App {
     pub fn new(file: PathBuf, windowed: bool) -> Self {
         let app = Application::builder().application_id("dev.ink.ui").build();
         let lua = Rc::new(Lua::new());
+
+        globals::init(&lua).expect("Failed to initialize Lua globals");
+
         Self {
             app,
             lua,
@@ -31,11 +35,10 @@ impl App {
 
         self.app.connect_activate(move |app| {
             if let Some(parent) = path.parent().and_then(|p| p.to_str()) {
-                let _ = lua
-                    .globals()
-                    .get::<Table>("package")
-                    .unwrap()
-                    .set("path", format!("{};{}/?.lua", "", parent));
+                let _ = lua.globals().get::<Table>("package").unwrap().set(
+                    "path",
+                    format!("{};{}/?.lua;{}/?/init.lua", "", parent, parent),
+                );
             }
 
             if !path.exists() {

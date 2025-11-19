@@ -1,3 +1,4 @@
+-- to run, ink example.lua
 ---@type WindowConfig
 return {
 	type = "GtkApplicationWindow",

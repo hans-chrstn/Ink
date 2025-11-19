@@ -24,7 +24,6 @@ impl WindowStrategy {
         window.init_layer_shell();
         window.present();
 
-        // Layer
         let layer = match data
             .get_property("layer")
             .and_then(|v| v.as_string())
@@ -37,20 +36,17 @@ impl WindowStrategy {
         };
         window.set_layer(layer);
 
-        // Anchors
         if let Some(anchors) = data.get_property("anchors") {
             Self::set_anchor(window, &anchors, "top", Edge::Top);
             Self::set_anchor(window, &anchors, "bottom", Edge::Bottom);
             Self::set_anchor(window, &anchors, "left", Edge::Left);
             Self::set_anchor(window, &anchors, "right", Edge::Right);
         } else {
-            // Default anchors
             window.set_anchor(Edge::Top, true);
             window.set_anchor(Edge::Left, true);
             window.set_anchor(Edge::Right, true);
         }
 
-        // Exclusive Zone
         if let Some(z) = data
             .get_property("exclusive_zone")
             .and_then(|v| v.as_integer())
