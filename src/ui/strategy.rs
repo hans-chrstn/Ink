@@ -1,6 +1,7 @@
 use crate::scripting::traits::ScriptValue;
-use crate::ui::traits::{WidgetContainer, WidgetBehavior};
-use gtk4::{ApplicationWindow, Widget, prelude::*};
+use crate::ui::traits::{WidgetBehavior, WidgetContainer};
+use gtk4::prelude::*;
+use gtk4::{ApplicationWindow, Widget};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 
 pub struct WindowStrategy {
@@ -21,14 +22,19 @@ impl WindowStrategy {
 
 impl<T: ScriptValue> WidgetBehavior<T> for WindowStrategy {
     fn apply(&self, widget: &Widget, data: &T) {
-        let Some(window) = widget.downcast_ref::<ApplicationWindow>() else { return };
+        let Some(window) = widget.downcast_ref::<ApplicationWindow>() else {
+            return;
+        };
 
         if self.force_windowed {
             window.present();
             return;
         }
 
-        let mode = data.get_property("window_mode").and_then(|v| v.as_string()).unwrap_or_else(|| "layer_shell".into());
+        let mode = data
+            .get_property("window_mode")
+            .and_then(|v| v.as_string())
+            .unwrap_or_else(|| "layer_shell".into());
 
         if mode == "normal" {
             window.present();
@@ -38,7 +44,11 @@ impl<T: ScriptValue> WidgetBehavior<T> for WindowStrategy {
         window.init_layer_shell();
         window.present();
 
-        let layer = match data.get_property("layer").and_then(|v| v.as_string()).as_deref() {
+        let layer = match data
+            .get_property("layer")
+            .and_then(|v| v.as_string())
+            .as_deref()
+        {
             Some("bottom") => Layer::Bottom,
             Some("overlay") => Layer::Overlay,
             Some("background") => Layer::Background,
@@ -57,19 +67,28 @@ impl<T: ScriptValue> WidgetBehavior<T> for WindowStrategy {
             window.set_anchor(Edge::Right, true);
         }
 
-        if let Some(z) = data.get_property("exclusive_zone").and_then(|v| v.as_integer()) {
+        if let Some(z) = data
+            .get_property("exclusive_zone")
+            .and_then(|v| v.as_integer())
+        {
             window.set_exclusive_zone(z as i32);
-        } else if let Some(true) = data.get_property("auto_exclusive_zone").and_then(|v| v.as_bool()) {
+        } else if let Some(true) = data
+            .get_property("auto_exclusive_zone")
+            .and_then(|v| v.as_bool())
+        {
             window.auto_exclusive_zone_enable();
         }
-        
-        if let Some(kb) = data.get_property("keyboard_mode").and_then(|v| v.as_string()) {
-             let mode = match kb.as_str() {
-                 "exclusive" => gtk4_layer_shell::KeyboardMode::Exclusive,
-                 "on_demand" => gtk4_layer_shell::KeyboardMode::OnDemand,
-                 _ => gtk4_layer_shell::KeyboardMode::None,
-             };
-             window.set_keyboard_mode(mode);
+
+        if let Some(kb) = data
+            .get_property("keyboard_mode")
+            .and_then(|v| v.as_string())
+        {
+            let mode = match kb.as_str() {
+                "exclusive" => gtk4_layer_shell::KeyboardMode::Exclusive,
+                "on_demand" => gtk4_layer_shell::KeyboardMode::OnDemand,
+                _ => gtk4_layer_shell::KeyboardMode::None,
+            };
+            window.set_keyboard_mode(mode);
         }
     }
 }
@@ -87,11 +106,25 @@ impl GridStrategy {
 
 impl<T: ScriptValue> WidgetContainer<T> for GridStrategy {
     fn add_child(&self, child: &Widget, data: &T) {
-        let col = data.get_property("grid_col").and_then(|v| v.as_integer()).unwrap_or(0) as i32;
-        let row = data.get_property("grid_row").and_then(|v| v.as_integer()).unwrap_or(0) as i32;
-        let w = data.get_property("grid_width").and_then(|v| v.as_integer()).unwrap_or(1) as i32;
-        let h = data.get_property("grid_height").and_then(|v| v.as_integer()).unwrap_or(1) as i32;
-        
+        let props = data.get_property("properties");
+
+        let get_val = |key: &str, default: i32| -> i32 {
+            if let Some(v) = data.get_property(key).and_then(|x| x.as_integer()) {
+                return v as i32;
+            }
+            if let Some(p) = &props {
+                if let Some(v) = p.get_property(key).and_then(|x| x.as_integer()) {
+                    return v as i32;
+                }
+            }
+            default
+        };
+
+        let col = get_val("grid_col", 0);
+        let row = get_val("grid_row", 0);
+        let w = get_val("grid_width", 1);
+        let h = get_val("grid_height", 1);
+
         self.grid.attach(child, col, row, w, h);
     }
 }

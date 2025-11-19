@@ -1,4 +1,14 @@
+use gtk4::prelude::*;
 use std::fmt::Debug;
+
+#[derive(Debug, Clone)]
+pub enum ScriptArg {
+    Nil,
+    Bool(bool),
+    Number(f64),
+    String(String),
+    Widget(gtk4::Widget),
+}
 
 pub trait ScriptValue: Sized + Clone + Debug {
     fn is_string(&self) -> bool;
@@ -15,5 +25,5 @@ pub trait ScriptValue: Sized + Clone + Debug {
     fn get_array_items(&self) -> Option<Vec<Self>>;
     fn get_map_entries(&self) -> Option<Vec<(String, Self)>>;
 
-    fn call_void(&self) -> Result<(), String>;
+    fn call(&self, args: Vec<ScriptArg>) -> Result<ScriptArg, String>;
 }
