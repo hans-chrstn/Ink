@@ -1,5 +1,5 @@
 use crate::scripting::traits::ScriptValue;
-use mlua::{Table, Value};
+use mlua::Value;
 
 #[derive(Clone, Debug)]
 pub struct LuaWrapper(pub Value);

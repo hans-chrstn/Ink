@@ -3,7 +3,7 @@ use gtk4::glib::object::ObjectClass;
 use gtk4::prelude::*;
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub fn generate(path: Option<PathBuf>) -> std::io::Result<()> {
     let p = path.unwrap_or_else(|| PathBuf::from("definitions.lua"));

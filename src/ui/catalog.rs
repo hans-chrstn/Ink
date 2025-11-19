@@ -1,6 +1,5 @@
 use crate::ui::registry::Registry;
-use crate::ui::traits::WidgetContainer;
-use gtk4::{self, prelude::*};
+use gtk4::{self};
 
 macro_rules! leafs { ($($t:ty),* $(,)?) => { $( Registry::register_leaf::<$t>(); )* }; }
 macro_rules! containers { ($($t:ty),* $(,)?) => { $( Registry::register_container::<$t>(); )* }; }

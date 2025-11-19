@@ -1,5 +1,5 @@
 use crate::ui::traits::{LeafStrategy, WidgetContainer};
-use gtk4::glib::{self, Type};
+use gtk4::glib::Type;
 use gtk4::prelude::*;
 use std::collections::HashMap;
 use std::sync::{OnceLock, RwLock};

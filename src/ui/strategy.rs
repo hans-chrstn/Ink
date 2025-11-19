@@ -1,6 +1,6 @@
 use crate::scripting::traits::ScriptValue;
 use gtk4::{ApplicationWindow, prelude::*};
-use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
+use gtk4_layer_shell::{Edge, Layer, LayerShell};
 
 pub struct WindowStrategy;
 
