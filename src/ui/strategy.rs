@@ -1,12 +1,31 @@
 use crate::scripting::traits::ScriptValue;
-use gtk4::{ApplicationWindow, prelude::*};
+use crate::ui::traits::WidgetBehavior;
+use gtk4::{ApplicationWindow, Widget, prelude::*};
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 
-pub struct WindowStrategy;
+pub struct WindowStrategy {
+    pub force_windowed: bool,
+}
 
 impl WindowStrategy {
-    pub fn apply<T: ScriptValue>(window: &ApplicationWindow, data: &T, force_windowed: bool) {
-        if force_windowed {
+    pub fn new(force_windowed: bool) -> Self {
+        Self { force_windowed }
+    }
+
+    fn set_anchor<T: ScriptValue>(w: &ApplicationWindow, data: &T, key: &str, edge: Edge) {
+        if let Some(val) = data.get_property(key).and_then(|v| v.as_bool()) {
+            w.set_anchor(edge, val);
+        }
+    }
+}
+
+impl<T: ScriptValue> WidgetBehavior<T> for WindowStrategy {
+    fn apply(&self, widget: &Widget, data: &T) {
+        let Some(window) = widget.downcast_ref::<ApplicationWindow>() else {
+            return;
+        };
+
+        if self.force_windowed {
             window.present();
             return;
         }
@@ -57,12 +76,6 @@ impl WindowStrategy {
             .and_then(|v| v.as_bool())
         {
             window.auto_exclusive_zone_enable();
-        }
-    }
-
-    fn set_anchor<T: ScriptValue>(w: &ApplicationWindow, data: &T, key: &str, edge: Edge) {
-        if let Some(val) = data.get_property(key).and_then(|v| v.as_bool()) {
-            w.set_anchor(edge, val);
         }
     }
 }

@@ -1,6 +1,7 @@
 use crate::scripting::globals;
 use crate::scripting::lua_driver::LuaWrapper;
 use crate::ui::builder::UiBuilder;
+use crate::ui::strategy::WindowStrategy;
 use gtk4::{Application, prelude::*};
 use mlua::{Lua, Table};
 use std::path::PathBuf;
@@ -31,7 +32,7 @@ impl App {
     pub fn run(&self) {
         let lua = self.lua.clone();
         let path = self.file.clone();
-        let force = self.windowed;
+        let windowed = self.windowed;
 
         self.app.connect_activate(move |app| {
             if let Some(parent) = path.parent().and_then(|p| p.to_str()) {
@@ -53,7 +54,12 @@ impl App {
                     if let mlua::Value::Table(table) = table_val {
                         let wrapped = LuaWrapper(mlua::Value::Table(table));
 
-                        match UiBuilder::run(&wrapped, force) {
+                        let builder = UiBuilder::<LuaWrapper>::new().register_behavior(
+                            "GtkApplicationWindow",
+                            Box::new(WindowStrategy::new(windowed)),
+                        );
+
+                        match builder.build(&wrapped) {
                             Ok(root) => {
                                 if let Some(w) = root.downcast_ref::<gtk4::Window>() {
                                     w.set_application(Some(app));

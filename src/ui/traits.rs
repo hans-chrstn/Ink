@@ -1,8 +1,13 @@
+use crate::scripting::traits::ScriptValue;
 use gtk4::Widget;
 use gtk4::prelude::*;
 
 pub trait WidgetContainer {
     fn add_child(&self, child: &Widget);
+}
+
+pub trait WidgetBehavior<T: ScriptValue>: Send + Sync {
+    fn apply(&self, widget: &Widget, data: &T);
 }
 
 pub struct LeafStrategy;
@@ -58,7 +63,7 @@ impl WidgetContainer for gtk4::ListBox {
 
 impl WidgetContainer for gtk4::FlowBox {
     fn add_child(&self, child: &gtk4::Widget) {
-        self.insert(child, -1); // -1 means append
+        self.insert(child, -1);
     }
 }
 

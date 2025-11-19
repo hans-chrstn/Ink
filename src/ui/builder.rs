@@ -1,24 +1,37 @@
 use crate::interop::{converter::GenericConverter, signals::SignalConnector};
 use crate::scripting::traits::ScriptValue;
 use crate::ui::registry::Registry;
-use crate::ui::strategy::WindowStrategy;
+use crate::ui::traits::WidgetBehavior;
+use gtk4::Widget;
+use gtk4::glib::Object;
 use gtk4::prelude::*;
-use gtk4::{ApplicationWindow, Widget, glib::Object};
+use std::collections::HashMap;
 
-pub struct UiBuilder;
+pub struct UiBuilder<T: ScriptValue> {
+    behaviors: HashMap<String, Box<dyn WidgetBehavior<T>>>,
+}
 
-impl UiBuilder {
-    pub fn run<T: ScriptValue + 'static>(data: &T, force_windowed: bool) -> Result<Widget, String> {
-        let root = Self::build_recursive(data)?;
-
-        if let Some(win) = root.downcast_ref::<ApplicationWindow>() {
-            WindowStrategy::apply(win, data, force_windowed);
+impl<T: ScriptValue + 'static> UiBuilder<T> {
+    pub fn new() -> Self {
+        Self {
+            behaviors: HashMap::new(),
         }
-
-        Ok(root)
     }
 
-    fn build_recursive<T: ScriptValue + 'static>(data: &T) -> Result<Widget, String> {
+    pub fn register_behavior(
+        mut self,
+        type_name: &str,
+        behavior: Box<dyn WidgetBehavior<T>>,
+    ) -> Self {
+        self.behaviors.insert(type_name.to_string(), behavior);
+        self
+    }
+
+    pub fn build(&self, data: &T) -> Result<Widget, String> {
+        self.build_recursive(data)
+    }
+
+    fn build_recursive(&self, data: &T) -> Result<Widget, String> {
         let type_name = data
             .get_property("type")
             .and_then(|v| v.as_string())
@@ -62,9 +75,13 @@ impl UiBuilder {
         {
             let strategy = Registry::get_strategy(&type_name, &widget);
             for child_data in children {
-                let child_widget = Self::build_recursive(&child_data)?;
+                let child_widget = self.build_recursive(&child_data)?;
                 strategy.add_child(&child_widget);
             }
+        }
+
+        if let Some(behavior) = self.behaviors.get(&type_name) {
+            behavior.apply(&widget, data);
         }
 
         Ok(widget)
