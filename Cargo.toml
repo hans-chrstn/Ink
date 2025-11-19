@@ -2,6 +2,7 @@
 name = "ink"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
 
 [dependencies]
 gtk4 = { version = "0.10.2", package = "gtk4"}
