@@ -4,9 +4,14 @@ GTK4 Layer Shell framework scriptable in Lua.
 
 ## Requirements
 
-- Rust (latest stable)
-- GTK4
+- gtk4
+- gobject-introspection
+- glib
+- pango
+- glib
+- gdk-pixbuf
 - gtk4-layer-shell
+- luajit
 
 ## Installation
 
@@ -86,7 +91,6 @@ return {
 
 Bar (examples/bar)
 ![Bar](examples/bar/bar.png)
-
 
 Modularize Test (examples/modularize)
 
