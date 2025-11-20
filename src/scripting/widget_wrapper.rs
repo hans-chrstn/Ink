@@ -1,7 +1,7 @@
 use crate::scripting::lua_driver::LuaWrapper;
 use crate::ui::registry::Registry;
 use gtk4::prelude::*;
-use mlua::{Error, FromLua, Lua, UserData, UserDataMethods, Value};
+use mlua::{Error, FromLua, Function, Lua, UserData, UserDataMethods, Value};
 
 #[derive(Clone)]
 pub struct LuaWidget(pub gtk4::Widget);
@@ -67,6 +67,65 @@ impl UserData for LuaWidget {
             }
             Ok("".to_string())
         });
+
+        methods.add_method("get_value", |_, this, ()| {
+            if let Some(range) = this.0.downcast_ref::<gtk4::Range>() {
+                return Ok(range.value());
+            }
+            if let Some(pb) = this.0.downcast_ref::<gtk4::ProgressBar>() {
+                return Ok(pb.fraction());
+            }
+            Ok(0.0)
+        });
+
+        methods.add_method("set_value", |_, this, val: f64| {
+            if let Some(range) = this.0.downcast_ref::<gtk4::Range>() {
+                range.set_value(val);
+            } else if let Some(pb) = this.0.downcast_ref::<gtk4::ProgressBar>() {
+                pb.set_fraction(val);
+            }
+            Ok(())
+        });
+
+        methods.add_method("set_range", |_, this, (min, max): (f64, f64)| {
+            if let Some(range) = this.0.downcast_ref::<gtk4::Range>() {
+                range.set_range(min, max);
+            }
+            Ok(())
+        });
+
+        methods.add_method("set_increments", |_, this, (step, page): (f64, f64)| {
+            if let Some(range) = this.0.downcast_ref::<gtk4::Range>() {
+                range.set_increments(step, page);
+            }
+            Ok(())
+        });
+
+        methods.add_method(
+            "add_controller_motion",
+            |lua, this, (on_enter, on_leave): (Function, Function)| {
+                let controller = gtk4::EventControllerMotion::new();
+
+                let enter_cb = lua.create_registry_value(on_enter)?;
+                let lua_enter = lua.clone();
+                controller.connect_enter(move |_, _, _| {
+                    if let Ok(func) = lua_enter.registry_value::<Function>(&enter_cb) {
+                        let _ = func.call::<()>(());
+                    }
+                });
+
+                let leave_cb = lua.create_registry_value(on_leave)?;
+                let lua_leave = lua.clone();
+                controller.connect_leave(move |_| {
+                    if let Ok(func) = lua_leave.registry_value::<Function>(&leave_cb) {
+                        let _ = func.call::<()>(());
+                    }
+                });
+
+                this.0.add_controller(controller);
+                Ok(())
+            },
+        );
 
         methods.add_method("add", |_, this, (child, props): (LuaWidget, Value)| {
             let type_name = this.0.type_().name();

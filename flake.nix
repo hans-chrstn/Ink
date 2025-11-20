@@ -38,6 +38,7 @@
           ];
 
           buildInputs = with pkgs; [
+            luajit
             gtk4
             gtk4-layer-shell
             glib
@@ -46,6 +47,7 @@
             cairo
             graphene
             openssl
+            libpulseaudio
           ];
         };
       }

@@ -1,6 +1,6 @@
 use crate::scripting::traits::ScriptValue;
-use gtk4::prelude::*;
 use gtk4::Widget;
+use gtk4::prelude::*;
 
 pub trait WidgetContainer<T: ScriptValue> {
     fn add_child(&self, child: &Widget, data: &T);
@@ -53,6 +53,24 @@ impl_set_child!(
     gtk4::WindowHandle
 );
 
+impl<T: ScriptValue> WidgetContainer<T> for gtk4::CheckButton {
+    fn add_child(&self, child: &Widget, _: &T) {
+        self.set_property("child", child);
+    }
+}
+
+impl<T: ScriptValue> WidgetContainer<T> for gtk4::MenuButton {
+    fn add_child(&self, child: &Widget, _: &T) {
+        self.set_property("child", child);
+    }
+}
+
+impl<T: ScriptValue> WidgetContainer<T> for gtk4::LockButton {
+    fn add_child(&self, _child: &Widget, _: &T) {
+        eprintln!("Warn: LockButton does not support adding arbitrary children.");
+    }
+}
+
 impl<T: ScriptValue> WidgetContainer<T> for gtk4::ListBox {
     fn add_child(&self, child: &gtk4::Widget, _: &T) {
         self.append(child);
@@ -65,12 +83,6 @@ impl<T: ScriptValue> WidgetContainer<T> for gtk4::FlowBox {
     }
 }
 
-impl<T: ScriptValue> WidgetContainer<T> for gtk4::MenuButton {
-    fn add_child(&self, child: &Widget, _: &T) {
-        self.set_property("child", child);
-    }
-}
-
 impl<T: ScriptValue> WidgetContainer<T> for gtk4::Box {
     fn add_child(&self, child: &Widget, _: &T) {
         self.append(child);
@@ -79,9 +91,17 @@ impl<T: ScriptValue> WidgetContainer<T> for gtk4::Box {
 
 impl<T: ScriptValue> WidgetContainer<T> for gtk4::CenterBox {
     fn add_child(&self, child: &Widget, data: &T) {
-        if let Some("start") = data.get_property("type_pos").and_then(|v| v.as_string()).as_deref() {
+        if let Some("start") = data
+            .get_property("type_pos")
+            .and_then(|v| v.as_string())
+            .as_deref()
+        {
             self.set_start_widget(Some(child));
-        } else if let Some("end") = data.get_property("type_pos").and_then(|v| v.as_string()).as_deref() {
+        } else if let Some("end") = data
+            .get_property("type_pos")
+            .and_then(|v| v.as_string())
+            .as_deref()
+        {
             self.set_end_widget(Some(child));
         } else {
             self.set_center_widget(Some(child));

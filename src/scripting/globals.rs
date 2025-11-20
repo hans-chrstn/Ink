@@ -15,10 +15,42 @@ pub fn init(lua: Rc<Lua>) -> Result<()> {
     })?;
     globals.set("exit", exit)?;
 
+    let set_interval = lua.create_function(|lua, (ms, callback): (u32, Function)| {
+        let lua = lua.clone();
+        let cb_key = lua.create_registry_value(callback)?;
+
+        glib::timeout_add_local(std::time::Duration::from_millis(ms as u64), move || {
+            if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
+                if let Err(e) = func.call::<()>(()) {
+                    eprintln!("Interval Error: {}", e);
+                    return glib::ControlFlow::Break;
+                }
+            }
+            glib::ControlFlow::Continue
+        });
+        Ok(())
+    })?;
+    globals.set("setInterval", set_interval)?;
+
+    let set_timeout = lua.create_function(|lua, (ms, callback): (u32, Function)| {
+        let lua = lua.clone();
+        let cb_key = lua.create_registry_value(callback)?;
+
+        glib::timeout_add_local(std::time::Duration::from_millis(ms as u64), move || {
+            if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
+                if let Err(e) = func.call::<()>(()) {
+                    eprintln!("setTimeout Error: {}", e);
+                }
+            }
+            glib::ControlFlow::Break
+        });
+        Ok(())
+    })?;
+    globals.set("setTimeout", set_timeout)?;
+
     let create_widget = lua.create_function(move |_, config: Value| {
         let wrapped = LuaWrapper(config);
         let builder = UiBuilder::new();
-
         match builder.build(&wrapped) {
             Ok(w) => Ok(LuaWidget(w)),
             Err(e) => Err(mlua::Error::RuntimeError(e)),
@@ -35,17 +67,10 @@ pub fn init(lua: Rc<Lua>) -> Result<()> {
         let exec_async = lua.create_function(move |lua, (cmd, callback): (String, Function)| {
             let lua = lua.clone();
             let cb_key = lua.create_registry_value(callback)?;
-
             glib::MainContext::default().spawn_local(async move {
                 let result = stdlib::exec_async(cmd).await;
-
                 if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
-                    match result {
-                        Ok(output) => {
-                            let _ = func.call::<()>(output);
-                        }
-                        Err(e) => eprintln!("Async Exec Error: {}", e),
-                    }
+                    let _ = func.call::<()>(result);
                 }
             });
             Ok(())
@@ -63,17 +88,10 @@ pub fn init(lua: Rc<Lua>) -> Result<()> {
             lua.create_function(move |lua, (url, callback): (String, Function)| {
                 let lua = lua.clone();
                 let cb_key = lua.create_registry_value(callback)?;
-
                 glib::MainContext::default().spawn_local(async move {
                     let result = stdlib::fetch_async(url).await;
-
                     if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
-                        match result {
-                            Ok(output) => {
-                                let _ = func.call::<()>(output);
-                            }
-                            Err(e) => eprintln!("Async Fetch Error: {}", e),
-                        }
+                        let _ = func.call::<()>(result);
                     }
                 });
                 Ok(())
@@ -87,7 +105,7 @@ pub fn init(lua: Rc<Lua>) -> Result<()> {
     })?;
     globals.set("spawn", spawn)?;
 
-    services::init(&lua)?;
+    services::init(lua.clone())?;
 
     Ok(())
 }

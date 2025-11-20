@@ -4,8 +4,9 @@ use crate::ui::builder::UiBuilder;
 use crate::ui::strategy::WindowStrategy;
 use gtk4::gdk::Display;
 use gtk4::{Application, CssProvider, prelude::*};
-use mlua::{Lua, Table};
-use std::path::PathBuf;
+use mlua::{Function, Lua, Table};
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 pub struct App {
@@ -48,9 +49,7 @@ impl App {
                 return;
             }
 
-            let code = std::fs::read_to_string(&path).expect("Read failed");
-
-            match lua.load(&code).call::<mlua::Value>(()) {
+            match load_lua_script(&lua, &path).and_then(|f| f.call::<mlua::Value>(())) {
                 Ok(table_val) => {
                     if let mlua::Value::Table(table) = table_val {
                         let load_provider = |p: &CssProvider| {
@@ -83,7 +82,6 @@ impl App {
                         }
 
                         let wrapped = LuaWrapper(mlua::Value::Table(table));
-
                         let builder = UiBuilder::new().register_behavior(
                             "GtkApplicationWindow",
                             Box::new(WindowStrategy::new(windowed)),
@@ -106,5 +104,46 @@ impl App {
         });
 
         self.app.run_with_args::<&str>(&[]);
+    }
+}
+
+fn load_lua_script(lua: &Lua, path: &Path) -> mlua::Result<Function> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let cache_dir = PathBuf::from(home).join(".cache/ink/bytecode");
+
+    let filename = path.file_name().unwrap().to_string_lossy();
+    let abs_path_hash = match path.canonicalize() {
+        Ok(p) => format!("{:x}", md5::compute(p.to_string_lossy().as_bytes())),
+        Err(_) => "unknown".to_string(),
+    };
+
+    let cache_file = cache_dir.join(format!("{}_{}.luac", filename, abs_path_hash));
+
+    let mut use_cache = false;
+    if cache_file.exists() {
+        if let (Ok(src_meta), Ok(cache_meta)) = (fs::metadata(path), fs::metadata(&cache_file)) {
+            if let (Ok(src_time), Ok(cache_time)) = (src_meta.modified(), cache_meta.modified()) {
+                if cache_time > src_time {
+                    use_cache = true;
+                }
+            }
+        }
+    }
+
+    if use_cache {
+        let bytes = fs::read(&cache_file).map_err(mlua::Error::external)?;
+        lua.load(&bytes).into_function()
+    } else {
+        let code = fs::read_to_string(path).map_err(mlua::Error::external)?;
+        let func = lua.load(&code).set_name(filename).into_function()?;
+
+        if let Err(_) = fs::create_dir_all(&cache_dir) {
+            return Ok(func);
+        }
+
+        let bytes = func.dump(true);
+        let _ = fs::write(&cache_file, bytes);
+
+        Ok(func)
     }
 }

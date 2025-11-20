@@ -48,6 +48,14 @@ pub fn register(lua: &Lua) -> Result<()> {
     )?;
 
     sys.set(
+        "set_clipboard",
+        lua.create_function(|_, text: String| {
+            let _ = std::process::Command::new("wl-copy").arg(text).spawn();
+            Ok(())
+        })?,
+    )?;
+
+    sys.set(
         "media_info",
         lua.create_function(|_, ()| {
             let title = Command::new("playerctl")
