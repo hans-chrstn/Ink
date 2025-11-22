@@ -37,7 +37,7 @@ impl UiBuilder {
         let type_name = data
             .get_property("type")
             .and_then(|v| v.as_string())
-            .ok_or("Widget missing 'type' field")?;
+            .unwrap_or_else(|| "GtkWindow".to_string());
 
         let gtype =
             Registry::get_type(&type_name).ok_or_else(|| format!("Unknown type: {}", type_name))?;

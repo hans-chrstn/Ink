@@ -11,6 +11,9 @@ pub struct Config {
     pub file: Option<PathBuf>,
 
     #[arg(long, global = true)]
+    pub main_path: Option<PathBuf>,
+
+    #[arg(long, global = true)]
     pub windowed: bool,
 }
 

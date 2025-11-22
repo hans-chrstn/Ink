@@ -1,3 +1,4 @@
+use crate::core::context::AppContext;
 use crate::scripting::globals;
 use crate::scripting::lua_driver::LuaWrapper;
 use crate::ui::builder::UiBuilder;
@@ -8,48 +9,56 @@ use mlua::{Function, Lua, Table};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct App {
     app: Application,
     lua: Rc<Lua>,
-    file: PathBuf,
+    context: Arc<AppContext>,
     windowed: bool,
 }
 
 impl App {
-    pub fn new(file: PathBuf, windowed: bool) -> Self {
-        let app = Application::builder().application_id("dev.ink.ui").build();
+    pub fn new(app: Application, context: AppContext, windowed: bool) -> Self {
         let lua = Rc::new(Lua::new());
 
-        globals::init(lua.clone()).expect("Failed to initialize Lua globals");
+        globals::init(lua.clone(), app.clone()).expect("Failed to initialize Lua globals");
 
         Self {
             app,
             lua,
-            file,
+            context: Arc::new(context),
             windowed,
         }
     }
 
-    pub fn run(&self) {
+    pub fn setup(&mut self) {
         let lua = self.lua.clone();
-        let path = self.file.clone();
+        let context = self.context.clone();
         let windowed = self.windowed;
 
         self.app.connect_activate(move |app| {
-            if let Some(parent) = path.parent().and_then(|p| p.to_str()) {
+            let main_file_path = &context.main_file_path;
+
+            if let Some(parent) = main_file_path.parent().and_then(|p| p.to_str()) {
                 let _ = lua.globals().get::<Table>("package").unwrap().set(
                     "path",
                     format!("{};{}/?.lua;{}/?/init.lua", "", parent, parent),
                 );
             }
 
-            if !path.exists() {
-                eprintln!("Error: File not found: {:?}", path);
+            if let Some(main_file_str) = main_file_path.to_str() {
+                lua.globals()
+                    .set("INK_MAIN_FILE_PATH", main_file_str)
+                    .expect("Failed to set INK_MAIN_FILE_PATH");
+            }
+
+            if !main_file_path.exists() {
+                eprintln!("Error: File not found: {:?}", main_file_path);
                 return;
             }
 
-            match load_lua_script(&lua, &path).and_then(|f| f.call::<mlua::Value>(())) {
+            match load_lua_script(&lua, main_file_path).and_then(|f| f.call::<mlua::Value>(())) {
                 Ok(table_val) => {
                     if let mlua::Value::Table(table) = table_val {
                         let load_provider = |p: &CssProvider| {
@@ -63,7 +72,7 @@ impl App {
                         };
 
                         if let Ok(rel_path) = table.get::<String>("css_path") {
-                            let mut css_file = path.parent().unwrap().to_path_buf();
+                            let mut css_file = main_file_path.parent().unwrap().to_path_buf();
                             css_file.push(rel_path);
 
                             if css_file.exists() {
@@ -81,19 +90,39 @@ impl App {
                             load_provider(&provider);
                         }
 
-                        let wrapped = LuaWrapper(mlua::Value::Table(table));
-                        let builder = UiBuilder::new().register_behavior(
-                            "GtkApplicationWindow",
-                            Box::new(WindowStrategy::new(windowed)),
-                        );
+                        let first_item = table.raw_get(1);
 
-                        match builder.build(&wrapped) {
-                            Ok(root) => {
-                                if let Some(w) = root.downcast_ref::<gtk4::Window>() {
-                                    w.set_application(Some(app));
+                        let window_configs = if let Ok(mlua::Value::Table(_)) = first_item {
+                            table
+                                .sequence_values::<mlua::Table>()
+                                .filter_map(Result::ok)
+                                .map(mlua::Value::Table)
+                                .collect()
+                        } else {
+                            vec![mlua::Value::Table(table.clone())]
+                        };
+
+                        for config in window_configs {
+                            let wrapped = LuaWrapper(config);
+                            let builder = UiBuilder::new()
+                                .register_behavior(
+                                    "GtkApplicationWindow",
+                                    Box::new(WindowStrategy::new(windowed)),
+                                )
+                                .register_behavior(
+                                    "GtkWindow",
+                                    Box::new(WindowStrategy::new(windowed)),
+                                );
+
+                            match builder.build(&wrapped) {
+                                Ok(root) => {
+                                    if let Some(w) = root.downcast_ref::<gtk4::Window>() {
+                                        w.set_application(Some(app));
+                                        w.show();
+                                    }
                                 }
+                                Err(e) => eprintln!("Builder Error: {}", e),
                             }
-                            Err(e) => eprintln!("Builder Error: {}", e),
                         }
                     } else {
                         eprintln!("Error: Lua script must return a UI Table");
@@ -102,8 +131,6 @@ impl App {
                 Err(e) => eprintln!("Lua Execution Failed: {}", e),
             }
         });
-
-        self.app.run_with_args::<&str>(&[]);
     }
 }
 

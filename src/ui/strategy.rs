@@ -1,7 +1,7 @@
 use crate::scripting::traits::ScriptValue;
 use crate::ui::traits::{WidgetBehavior, WidgetContainer};
 use gtk4::prelude::*;
-use gtk4::{ApplicationWindow, Widget};
+use gtk4::Widget;
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 
 pub struct WindowStrategy {
@@ -13,7 +13,7 @@ impl WindowStrategy {
         Self { force_windowed }
     }
 
-    fn set_anchor<T: ScriptValue>(w: &ApplicationWindow, data: &T, key: &str, edge: Edge) {
+    fn set_anchor<T: ScriptValue>(w: &gtk4::Window, data: &T, key: &str, edge: Edge) {
         if let Some(val) = data.get_property(key).and_then(|v| v.as_bool()) {
             w.set_anchor(edge, val);
         }
@@ -22,7 +22,7 @@ impl WindowStrategy {
 
 impl<T: ScriptValue + 'static> WidgetBehavior<T> for WindowStrategy {
     fn apply(&self, widget: &Widget, data: &T) {
-        let Some(window) = widget.downcast_ref::<ApplicationWindow>() else {
+        let Some(window) = widget.downcast_ref::<gtk4::Window>() else {
             return;
         };
 

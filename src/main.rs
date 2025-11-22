@@ -8,6 +8,8 @@ mod ui;
 
 use crate::app::App;
 use crate::core::config::{Commands, Config};
+use crate::core::context::AppContext;
+use gtk4::prelude::*;
 use std::env;
 use std::path::PathBuf;
 
@@ -38,8 +40,15 @@ async fn main() {
     });
 
     if let Some(file) = target_file {
-        let app = App::new(file, config.windowed);
-        app.run();
+        let app = gtk4::Application::builder()
+            .application_id("dev.ink.ui")
+            .build();
+
+        let context = AppContext::new(file);
+        let mut app_instance = App::new(app.clone(), context, config.windowed);
+        app_instance.setup();
+
+        app.run_with_args::<&str>(&[]);
     } else {
         eprintln!("Error: No file provided.");
         eprintln!("Usage: ink <file.lua>");

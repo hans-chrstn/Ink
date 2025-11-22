@@ -22,6 +22,15 @@ impl FromLua for LuaWidget {
 
 impl UserData for LuaWidget {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("destroy", |_, this, ()| {
+            if let Some(window) = this.0.downcast_ref::<gtk4::Window>() {
+                window.destroy();
+            } else {
+                this.0.unparent();
+            }
+            Ok(())
+        });
+
         methods.add_method("set_visible", |_, this, visible: bool| {
             this.0.set_visible(visible);
             Ok(())
