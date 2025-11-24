@@ -56,6 +56,8 @@ impl UiBuilder {
                     if let Some(gval) = GenericConverter::to_gvalue(&v, pspec.value_type()) {
                         widget.set_property(&k, gval);
                     }
+                } else {
+                    return Err(format!("Property '{}' not found on type '{}'", k, type_name));
                 }
             }
         }

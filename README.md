@@ -11,9 +11,7 @@ GTK4 Layer Shell framework scriptable in Lua.
 - glib
 - gdk-pixbuf
 - gtk4-layer-shell
-- luajit
 - libpulse
-- wl-clipboard
 
 ## Installation
 

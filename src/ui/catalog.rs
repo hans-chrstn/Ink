@@ -1,12 +1,9 @@
 use crate::ui::registry::Registry;
 use gtk4::{self};
-
 macro_rules! leafs { ($($t:ty),* $(,)?) => { $( Registry::register_leaf::<$t>(); )* }; }
 macro_rules! containers { ($($t:ty),* $(,)?) => { $( Registry::register_container::<$t>(); )* }; }
-
 pub fn init() {
     Registry::register_grid();
-
     containers!(
         gtk4::Window,
         gtk4::ApplicationWindow,
@@ -41,7 +38,6 @@ pub fn init() {
         gtk4::MenuButton,
         gtk4::CheckButton,
     );
-
     leafs!(
         gtk4::Label,
         gtk4::Image,

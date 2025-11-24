@@ -2,18 +2,14 @@ use crate::scripting::traits::ScriptValue;
 use gtk4::glib::translate::*;
 use gtk4::glib::{EnumClass, StrV, Type, Value};
 use gtk4::prelude::*;
-
 pub struct GenericConverter;
-
 impl GenericConverter {
     pub fn to_gvalue<T: ScriptValue>(val: &T, target: Type) -> Option<Value> {
         if val.is_string() {
             let s = val.as_string()?;
-
             if target == String::static_type() {
                 return Some(s.to_value());
             }
-
             if target.is_a(Type::ENUM) {
                 if let Some(enum_class) = EnumClass::with_type(target) {
                     if let Some(enum_val) = enum_class.value_by_nick(&s) {
@@ -26,11 +22,9 @@ impl GenericConverter {
                 }
             }
         }
-
         if val.is_bool() && target == bool::static_type() {
             return val.as_bool().map(|b| b.to_value());
         }
-
         if val.is_number() {
             let n = val.as_number()?;
             if target == i32::static_type() {
@@ -45,7 +39,6 @@ impl GenericConverter {
                 return Some((n as f32).to_value());
             }
         }
-
         if target == StrV::static_type() {
             if let Some(items) = val.get_array_items() {
                 let strings: Vec<String> =

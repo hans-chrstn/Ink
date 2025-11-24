@@ -1,11 +1,7 @@
--- to run, ink example.lua
----@type WindowConfig
 return {
 	type = "GtkApplicationWindow",
-
-	-- path to your css
-	-- css_path = "style.css",
-
+	
+	
 	css = [[
         button {
             background-color: gray;
@@ -16,18 +12,15 @@ return {
             font-size: 20px;
             color: black;
         }
-
         .my-window {
           background-color: white;
           border-radius: 20px;
           margin: 5px;
         }
-
         .bar {
           padding: 5px;
         }
     ]],
-
 	window_mode = "layer_shell",
 	layer = "top",
 	anchors = {
@@ -42,13 +35,11 @@ return {
 		right = 10,
 	},
 	auto_exclusive_zone = true,
-
 	properties = {
 		title = "My Ink Bar",
 		default_height = 40,
 		css_classes = { "my-window" },
 	},
-
 	children = {
 		{
 			type = "GtkBox",

@@ -1,5 +1,4 @@
 local notifications = require("notifications")
-
 return {
 	title = "Custom Notifications Test",
 	default_width = 400,

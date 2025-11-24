@@ -53,9 +53,7 @@ return {
 						},
 					},
 				},
-
 				{ type = "GtkSeparator", properties = { orientation = "horizontal" } },
-
 				{
 					type = "GtkLabel",
 					properties = { label = "<b>2. Interactive Widgets (Self)</b>", use_markup = true, xalign = 0 },
@@ -94,14 +92,11 @@ return {
 						end,
 					},
 				},
-
 				{ type = "GtkSeparator", properties = { orientation = "horizontal" } },
-
 				{
 					type = "GtkLabel",
 					properties = { label = "<b>3. Async &amp; Services</b>", use_markup = true, xalign = 0 },
 				},
-
 				{
 					type = "GtkButton",
 					properties = { label = "Check Battery & Wifi" },

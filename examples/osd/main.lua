@@ -1,54 +1,43 @@
 local cfg = require("config")
-
 local volume_slider = nil
 local revealer = nil
 local hide_timer = nil
 local ignore_update = false
 local is_hovered = false
-
 local function try_hide()
 	if is_hovered then
 		hide_timer = setTimeout(500, try_hide)
 		return
 	end
-
 	if revealer then
 		revealer:set_property("reveal_child", false)
 	end
 	hide_timer = nil
 end
-
 local function show_osd()
 	if revealer then
 		revealer:set_property("reveal_child", true)
 	end
-
 	if hide_timer then
 		clearTimeout(hide_timer)
 	end
-
 	hide_timer = setTimeout(2000, try_hide)
 end
-
 local function sync_volume()
 	local vol = Audio.get_volume()
-
 	if volume_slider then
 		ignore_update = true
 		volume_slider:set_value(vol)
 		ignore_update = false
 	end
-
 	show_osd()
 end
-
 return {
 	type = "GtkApplicationWindow",
 	window_mode = "layer_shell",
 	layer = "overlay",
 	anchors = { bottom = true, left = false, right = false, top = false },
 	margins = { bottom = 100 },
-
 	css = [[
         window { background-color: transparent; }
         .osd-box { 
@@ -61,7 +50,6 @@ return {
         scale highlight { background-color: #3584e4; border-radius: 3px; }
         scale slider { min-width: 20px; min-height: 20px; background-color: white; border-radius: 50%; }
     ]],
-
 	children = {
 		{
 			type = "GtkRevealer",
@@ -73,7 +61,6 @@ return {
 			signals = {
 				map = function(self)
 					revealer = self
-
 					self:add_controller_motion(function()
 						is_hovered = true
 						show_osd()
@@ -81,11 +68,9 @@ return {
 						is_hovered = false
 						show_osd()
 					end)
-
 					Audio.watch(function()
 						sync_volume()
 					end)
-
 					sync_volume()
 				end,
 			},

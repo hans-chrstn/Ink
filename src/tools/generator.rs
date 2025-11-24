@@ -4,7 +4,6 @@ use gtk4::prelude::*;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-
 pub fn generate(target_dir: Option<PathBuf>) -> std::io::Result<()> {
     let dir = match target_dir {
         Some(d) => d,
@@ -13,19 +12,15 @@ pub fn generate(target_dir: Option<PathBuf>) -> std::io::Result<()> {
             PathBuf::from(home).join(".config").join("ink")
         }
     };
-
     if !dir.exists() {
         fs::create_dir_all(&dir)?;
     }
-
     generate_definitions(&dir.join("definitions.lua"))?;
     generate_luarc(&dir.join(".luarc.json"))?;
     generate_main(&dir.join("main.lua"))?;
     generate_config(&dir.join("config.lua"))?;
-
     Ok(())
 }
-
 fn generate_definitions(path: &Path) -> std::io::Result<()> {
     let mut f = File::create(path)?;
     writeln!(f, "---@meta")?;
@@ -34,18 +29,15 @@ fn generate_definitions(path: &Path) -> std::io::Result<()> {
         "-- Auto-generated definitions for Ink. Do not edit manually."
     )?;
     writeln!(f, "")?;
-
     writeln!(f, "---@class WidgetConfig")?;
     writeln!(f, "---@field type string")?;
     writeln!(f, "---@field properties? table")?;
     writeln!(f, "---@field signals? table")?;
     writeln!(f, "---@field children? WidgetConfig[]")?;
     writeln!(f, "")?;
-
     for t in Registry::get_all_types() {
         let name = t.name();
         let props_name = format!("{}Props", name);
-
         writeln!(f, "---@class {}", props_name)?;
         if let Some(oc) = ObjectClass::from_type(t) {
             for p in oc.list_properties() {
@@ -58,11 +50,9 @@ fn generate_definitions(path: &Path) -> std::io::Result<()> {
             }
         }
         writeln!(f, "")?;
-
         writeln!(f, "---@class {}Config : WidgetConfig", name)?;
         writeln!(f, "---@field type \"{}\"", name)?;
         writeln!(f, "---@field properties? {}", props_name)?;
-
         if name == "GtkApplicationWindow" {
             writeln!(f, "---@field window_mode? \"layer_shell\" | \"normal\"")?;
             writeln!(
@@ -82,7 +72,6 @@ fn generate_definitions(path: &Path) -> std::io::Result<()> {
     }
     Ok(())
 }
-
 fn generate_luarc(path: &Path) -> std::io::Result<()> {
     let content = r#"{
     "workspace": {
@@ -102,17 +91,14 @@ fn generate_luarc(path: &Path) -> std::io::Result<()> {
     fs::write(path, content)?;
     Ok(())
 }
-
 fn generate_main(path: &Path) -> std::io::Result<()> {
     if path.exists() {
         return Ok(());
     }
     let content = r#"local cfg = require("config")
-
 ---@type WindowConfig
 return {
 	type = "GtkApplicationWindow",
-
   -- css_path = "path-to-your-css.css",
 	css = [[
         button {
@@ -124,13 +110,11 @@ return {
             font-size: 20px;
             color: black;
         }
-
         .my-window {
           background-color: white;
           border-radius: 20px;
           margin: 5px;
         }
-
         .bar {
           padding: 5px;
         }
@@ -173,7 +157,6 @@ return {
     fs::write(path, content)?;
     Ok(())
 }
-
 fn generate_config(path: &Path) -> std::io::Result<()> {
     if path.exists() {
         return Ok(());

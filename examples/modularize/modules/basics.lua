@@ -1,5 +1,4 @@
 local cfg = require("config")
-
 return {
 	type = "GtkBox",
 	properties = {
@@ -13,15 +12,10 @@ return {
 	},
 	children = {
 		{ type = "GtkLabel", properties = { label = "<b>Basic Inputs</b>", use_markup = true, xalign = 0 } },
-
 		{ type = "GtkEntry", properties = { placeholder_text = "Type text here..." } },
-
 		{ type = "GtkPasswordEntry", properties = { placeholder_text = "Secret Password", show_peek_icon = true } },
-
 		{ type = "GtkSearchEntry", properties = { placeholder_text = "Search..." } },
-
 		{ type = "GtkSeparator", properties = { orientation = "horizontal" } },
-
 		{
 			type = "GtkBox",
 			properties = { orientation = "horizontal", spacing = 10 },
@@ -30,11 +24,8 @@ return {
 				{ type = "GtkLabel", properties = { label = "Enable Turbo Mode" } },
 			},
 		},
-
 		{ type = "GtkCheckButton", properties = { label = "I agree to the terms", active = false } },
-
 		{ type = "GtkSeparator", properties = { orientation = "horizontal" } },
-
 		{ type = "GtkLabel", properties = { label = "Volume", xalign = 0 } },
 		{
 			type = "GtkScale",
@@ -46,7 +37,6 @@ return {
 				has_origin = true,
 			},
 		},
-
 		{ type = "GtkLabel", properties = { label = "Download Progress", xalign = 0 } },
 		{
 			type = "GtkProgressBar",
@@ -56,7 +46,6 @@ return {
 				text = "75%",
 			},
 		},
-
 		{ type = "GtkLevelBar", properties = { value = 0.4, max_value = 1.0 } },
 	},
 }

@@ -1,10 +1,8 @@
 use crate::scripting::traits::{ScriptArg, ScriptValue};
 use crate::scripting::widget_wrapper::LuaWidget;
 use mlua::{IntoLua, IntoLuaMulti, MultiValue, Value};
-
 #[derive(Clone, Debug)]
 pub struct LuaWrapper(pub Value);
-
 impl IntoLua for ScriptArg {
     fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<Value> {
         match self {
@@ -16,9 +14,7 @@ impl IntoLua for ScriptArg {
         }
     }
 }
-
 struct ScriptArgs(Vec<ScriptArg>);
-
 impl IntoLuaMulti for ScriptArgs {
     fn into_lua_multi(self, lua: &mlua::Lua) -> mlua::Result<MultiValue> {
         let mut vals = Vec::new();
@@ -28,7 +24,6 @@ impl IntoLuaMulti for ScriptArgs {
         Ok(MultiValue::from_vec(vals))
     }
 }
-
 fn lua_to_script_arg(val: Value) -> ScriptArg {
     match val {
         Value::Boolean(b) => ScriptArg::Bool(b),
@@ -40,7 +35,6 @@ fn lua_to_script_arg(val: Value) -> ScriptArg {
         _ => ScriptArg::Nil,
     }
 }
-
 impl ScriptValue for LuaWrapper {
     fn is_string(&self) -> bool {
         self.0.is_string()
@@ -54,14 +48,12 @@ impl ScriptValue for LuaWrapper {
     fn is_function(&self) -> bool {
         matches!(self.0, Value::Function(_))
     }
-
     fn as_string(&self) -> Option<String> {
         match &self.0 {
             Value::String(s) => s.to_str().ok().map(|x| x.to_string()),
             _ => None,
         }
     }
-
     fn as_number(&self) -> Option<f64> {
         match &self.0 {
             Value::Number(n) => Some(*n),
@@ -69,7 +61,6 @@ impl ScriptValue for LuaWrapper {
             _ => None,
         }
     }
-
     fn as_integer(&self) -> Option<i64> {
         match &self.0 {
             Value::Integer(i) => Some(*i),
@@ -77,14 +68,12 @@ impl ScriptValue for LuaWrapper {
             _ => None,
         }
     }
-
     fn as_bool(&self) -> Option<bool> {
         match &self.0 {
             Value::Boolean(b) => Some(*b),
             _ => None,
         }
     }
-
     fn get_property(&self, key: &str) -> Option<Self> {
         if let Value::Table(t) = &self.0 {
             t.get::<Value>(key).ok().map(LuaWrapper)
@@ -92,7 +81,6 @@ impl ScriptValue for LuaWrapper {
             None
         }
     }
-
     fn get_array_items(&self) -> Option<Vec<Self>> {
         if let Value::Table(t) = &self.0 {
             t.sequence_values()
@@ -103,7 +91,6 @@ impl ScriptValue for LuaWrapper {
             None
         }
     }
-
     fn get_map_entries(&self) -> Option<Vec<(String, Self)>> {
         if let Value::Table(t) = &self.0 {
             t.pairs::<String, Value>()
@@ -114,7 +101,6 @@ impl ScriptValue for LuaWrapper {
             None
         }
     }
-
     fn call(&self, args: Vec<ScriptArg>) -> Result<ScriptArg, String> {
         if let Value::Function(f) = &self.0 {
             let result: Value = f.call(ScriptArgs(args)).map_err(|e| e.to_string())?;

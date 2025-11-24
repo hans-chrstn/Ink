@@ -1,5 +1,4 @@
 local cfg = require("config")
-
 return {
 	type = "GtkBox",
 	properties = {
@@ -12,7 +11,6 @@ return {
 	},
 	children = {
 		{ type = "GtkLabel", properties = { label = "<b>System Interop</b>", use_markup = true, xalign = 0 } },
-
 		{
 			type = "GtkButton",
 			properties = { label = "Get System Kernel (exec)" },
@@ -23,7 +21,6 @@ return {
 				end,
 			},
 		},
-
 		{
 			type = "GtkButton",
 			properties = { label = "Launch File Manager (spawn)" },
@@ -33,9 +30,7 @@ return {
 				end,
 			},
 		},
-
 		{ type = "GtkSeparator", properties = { orientation = "horizontal" } },
-
 		{ type = "GtkLabel", properties = { label = "<b>Network</b>", use_markup = true, xalign = 0 } },
 		{
 			type = "GtkButton",
@@ -47,9 +42,7 @@ return {
 				end,
 			},
 		},
-
 		{ type = "GtkSeparator", properties = { orientation = "horizontal" } },
-
 		{ type = "GtkLabel", properties = { label = "<b>Visuals</b>", use_markup = true, xalign = 0 } },
 		{
 			type = "GtkBox",

@@ -1,13 +1,10 @@
 use crate::scripting::traits::{ScriptArg, ScriptValue};
 use gtk4::glib::{self, Object};
 use gtk4::prelude::*;
-
 pub struct SignalConnector;
-
 impl SignalConnector {
     pub fn connect<T: ScriptValue + 'static>(widget: &Object, name: &str, func: T) {
         let signal_name = name.replace("_", "-");
-
         widget.connect_local(name, false, move |values: &[glib::Value]| {
             let args: Vec<ScriptArg> = values
                 .iter()
@@ -27,7 +24,6 @@ impl SignalConnector {
                     }
                 })
                 .collect();
-
             let handle_return = |ret: ScriptArg| -> Option<glib::Value> {
                 match ret {
                     ScriptArg::Bool(b) => Some(b.to_value()),
@@ -43,7 +39,6 @@ impl SignalConnector {
                     _ => None,
                 }
             };
-
             match func.call(args) {
                 Ok(ret) => handle_return(ret),
                 Err(e) => {

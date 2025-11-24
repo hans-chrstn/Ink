@@ -1,5 +1,4 @@
 local cfg = require("config")
-
 return {
 	type = "GtkBox",
 	properties = {
@@ -13,7 +12,6 @@ return {
 	},
 	children = {
 		{ type = "GtkLabel", properties = { label = "<b>Complex Containers</b>", use_markup = true, xalign = 0 } },
-
 		{
 			type = "GtkExpander",
 			properties = {
@@ -30,9 +28,7 @@ return {
 				},
 			},
 		},
-
 		{ type = "GtkSeparator", properties = { orientation = "horizontal", margin_top = 10, margin_bottom = 10 } },
-
 		{ type = "GtkLabel", properties = { label = "Split View (Paned)", xalign = 0 } },
 		{
 			type = "GtkPaned",

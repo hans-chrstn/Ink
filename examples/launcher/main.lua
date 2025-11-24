@@ -47,7 +47,7 @@ local function filter_apps(text)
 	local query = text:lower()
 	for _, app in ipairs(apps) do
 		if app.name:lower():find(query, 1, true) then
-			local btn = Widget(create_app_button(app))
+			local btn = build_ui(create_app_button(app))
 			app_grid_widget:add(btn)
 		end
 	end
