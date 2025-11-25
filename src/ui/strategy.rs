@@ -57,11 +57,15 @@ impl<T: ScriptValue + 'static> WidgetBehavior<T> for WindowStrategy {
             .and_then(|v| v.as_string())
             .unwrap_or_else(|| "layer_shell".into());
         if mode == "normal" {
-            window.present();
+            if window.is_visible() {
+                window.present();
+            }
             return;
         }
         window.init_layer_shell();
-        window.present();
+        if window.is_visible() {
+            window.present();
+        }
         let layer = match data
             .get_property("layer")
             .and_then(|v| v.as_string())

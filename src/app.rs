@@ -2,6 +2,7 @@ use crate::core::context::AppContext;
 use crate::core::error;
 use crate::scripting::globals;
 use crate::scripting::lua_driver::LuaWrapper;
+use crate::scripting::traits::ScriptValue;
 use crate::ui::builder::UiBuilder;
 use crate::ui::strategy::WindowStrategy;
 use gio;
@@ -21,7 +22,13 @@ pub struct App {
 impl App {
     pub fn new(app: Application, context: AppContext, windowed: bool) -> Self {
         let lua = Rc::new(Lua::new());
-        globals::init(lua.clone(), app.clone()).expect("Failed to initialize Lua globals");
+        let config_dir = context
+            .main_file_path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf();
+        globals::init(lua.clone(), app.clone(), config_dir.clone())
+            .expect("Failed to initialize Lua globals");
         Self {
             app,
             lua,
@@ -29,145 +36,225 @@ impl App {
             windowed,
         }
     }
+
     pub fn setup(&mut self) {
         let lua = self.lua.clone();
         let context = self.context.clone();
         let windowed = self.windowed;
+
+        let app_clone_for_reload = self.app.clone();
+        let lua_clone_for_reload = self.lua.clone();
+        let context_clone_for_reload = self.context.clone();
+
         self.app.connect_activate(move |app| {
-            let main_file_path = &context.main_file_path;
-            if let Some(parent) = main_file_path.parent().and_then(|p| p.to_str()) {
-                let _ = lua.globals().get::<Table>("package").unwrap().set(
-                    "path",
-                    format!("{};{}/?.lua;{}/?/init.lua", "", parent, parent),
-                );
-            }
-            if let Some(main_file_str) = main_file_path.to_str() {
-                lua.globals()
-                    .set("INK_MAIN_FILE_PATH", main_file_str)
-                    .expect("Failed to set INK_MAIN_FILE_PATH");
-            }
-            if !main_file_path.exists() {
-                error::handle_error(
-                    app,
-                    "File Not Found",
-                    &format!("Error: File not found: {:?}", main_file_path),
-                );
-                return;
-            }
-            match load_lua_script(&lua, main_file_path).and_then(|f| f.call::<mlua::Value>(())) {
-                Ok(table_val) => {
-                    if let mlua::Value::Table(table) = table_val {
-                        
-                        let valid_keys = [
-                            "type", "window_mode", "layer", "anchors", "css_path", "css",
-                            "properties", "children", "signals", "keymaps", "margins",
-                            "auto_exclusive_zone", "keyboard_mode", "actions", "menu"
-                        ];
-                        for pair in table.pairs::<String, mlua::Value>() {
-                            if let Ok((key, _)) = pair {
-                                
-                                if !valid_keys.contains(&key.as_str()) && key.parse::<i32>().is_err() {
-                                    let err_msg = format!("Unknown configuration property: '{}'", key);
-                                    error::handle_error(app, "Invalid Configuration", &err_msg);
-                                    return;
-                                }
+            load_and_build_ui(app, &lua, &context, windowed);
+        });
+
+        if let Ok(ink_global) = self.lua.globals().get::<mlua::Table>("ink") {
+            ink_global
+                .set(
+                    "reload",
+                    self.lua
+                        .create_function(move |_, ()| {
+                            for window in app_clone_for_reload.windows() {
+                                window.destroy();
                             }
+                            load_and_build_ui(
+                                &app_clone_for_reload,
+                                &lua_clone_for_reload,
+                                &context_clone_for_reload,
+                                windowed,
+                            );
+                            Ok(())
+                        })
+                        .unwrap(),
+                )
+                .unwrap();
+        }
+    }
+}
+
+fn load_and_build_ui(app: &Application, lua: &Rc<Lua>, context: &Arc<AppContext>, windowed: bool) {
+    let main_file_path = &context.main_file_path;
+    let config_dir = main_file_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
+
+    if let Some(parent) = main_file_path.parent().and_then(|p| p.to_str()) {
+        let _ = lua.globals().get::<Table>("package").unwrap().set(
+            "path",
+            format!("{};{}/?.lua;{}/?/init.lua", "", parent, parent),
+        );
+    }
+    if let Some(main_file_str) = main_file_path.to_str() {
+        lua.globals()
+            .set("INK_MAIN_FILE_PATH", main_file_str)
+            .expect("Failed to set INK_MAIN_FILE_PATH");
+    }
+    if !main_file_path.exists() {
+        error::handle_error(
+            app,
+            "File Not Found",
+            &format!("Error: File not found: {:?}", main_file_path),
+        );
+        return;
+    }
+    match load_lua_script(&lua, main_file_path).and_then(|f| f.call::<mlua::Value>(())) {
+        Ok(table_val) => {
+            if let mlua::Value::Table(table) = table_val {
+                let valid_keys = [
+                    "type",
+                    "window_mode",
+                    "layer",
+                    "anchors",
+                    "css_path",
+                    "css",
+                    "properties",
+                    "children",
+                    "signals",
+                    "keymaps",
+                    "margins",
+                    "auto_exclusive_zone",
+                    "keyboard_mode",
+                    "actions",
+                    "menu",
+                ];
+                for pair in table.pairs::<String, mlua::Value>() {
+                    if let Ok((key, _)) = pair {
+                        if !valid_keys.contains(&key.as_str()) && key.parse::<i32>().is_err() {
+                            let err_msg = format!("Unknown configuration property: '{}'", key);
+                            error::handle_error(app, "Invalid Configuration", &err_msg);
+                            return;
                         }
-                        
-                        
-                        if let Ok(actions) = table.get::<mlua::Table>("actions") {
-                            for action_val in actions.sequence_values::<mlua::Table>() {
-                                if let Ok(action_table) = action_val {
-                                    if let (Ok(name), Ok(callback)) = (
-                                        action_table.get::<String>("name"),
-                                        action_table.get::<Function>("callback")
-                                    ) {
-                                        let action = gio::SimpleAction::new(&name, None);
-                                        let lua_rc = lua.clone();
-                                        let cb_key = lua_rc.create_registry_value(callback).unwrap();
-                                        action.connect_activate(move |_, _|
-                                            if let Ok(cb) = lua_rc.registry_value::<Function>(&cb_key) {
-                                                if let Err(e) = cb.call::<()>(()) {
-                                                    eprintln!("Action callback error: {}", e);
-                                                }
-                                            }
-                                        );
-                                        app.add_action(&action);
-                                    }
-                                }
-                            }
-                        }
-                        if let Ok(menu_table) = table.get::<mlua::Table>("menu") {
-                            let menubar = build_menu_from_lua(menu_table);
-                            app.set_menubar(Some(&menubar));
-                        }
-                        let load_provider = |p: &CssProvider| {
-                            if let Some(display) = Display::default() {
-                                gtk4::style_context_add_provider_for_display(
-                                    &display,
-                                    p,
-                                    gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
-                                );
-                            }
-                        };
-                        if let Ok(rel_path) = table.get::<String>("css_path") {
-                            let mut css_file = main_file_path.parent().unwrap().to_path_buf();
-                            css_file.push(rel_path);
-                            if css_file.exists() {
-                                let provider = CssProvider::new();
-                                provider.load_from_path(css_file.to_str().unwrap());
-                                load_provider(&provider);
-                            } else {
-                                eprintln!("Warn: CSS file not found at {:?}", css_file);
-                            }
-                        }
-                        if let Ok(css_content) = table.get::<String>("css") {
-                            let provider = CssProvider::new();
-                            provider.load_from_data(&css_content);
-                            load_provider(&provider);
-                        }
-                        let first_item = table.raw_get(1);
-                        let window_configs = if let Ok(mlua::Value::Table(_)) = first_item {
-                            table
-                                .sequence_values::<mlua::Table>()
-                                .filter_map(Result::ok)
-                                .map(mlua::Value::Table)
-                                .collect()
-                        } else {
-                            vec![mlua::Value::Table(table.clone())]
-                        };
-                        for config in window_configs {
-                            let wrapped = LuaWrapper(config);
-                            let builder = UiBuilder::new()
-                                .register_behavior(
-                                    "GtkApplicationWindow",
-                                    Box::new(WindowStrategy::new(windowed)),
-                                )
-                                .register_behavior(
-                                    "GtkWindow",
-                                    Box::new(WindowStrategy::new(windowed)),
-                                );
-                            match builder.build(&wrapped) {
-                                Ok(root) => {
-                                    if let Some(w) = root.downcast_ref::<gtk4::Window>() {
-                                        w.set_application(Some(app));
-                                        w.show();
-                                    }
-                                }
-                                Err(e) => {
-                                    error::handle_error(app, "UI Builder Error", &e);
-                                }
-                            }
-                        }
-                    } else {
-                        error::handle_error(app, "Invalid Configuration", "Lua script must return a UI Table");
                     }
                 }
-                Err(e) => {
-                    error::handle_error(app, "Lua Execution Failed", &e.to_string());
+
+                if let Ok(actions) = table.get::<mlua::Table>("actions") {
+                    for action_val in actions.sequence_values::<mlua::Table>() {
+                        if let Ok(action_table) = action_val {
+                            if let (Ok(name), Ok(callback)) = (
+                                action_table.get::<String>("name"),
+                                action_table.get::<Function>("callback"),
+                            ) {
+                                let action = gio::SimpleAction::new(&name, None);
+                                let lua_rc = lua.clone();
+                                let cb_key = lua_rc.create_registry_value(callback).unwrap();
+                                action.connect_activate(move |_, _| {
+                                    if let Ok(cb) = lua_rc.registry_value::<Function>(&cb_key) {
+                                        if let Err(e) = cb.call::<()>(()) {
+                                            eprintln!("Action callback error: {}", e);
+                                        }
+                                    }
+                                });
+                                app.add_action(&action);
+                            }
+                        }
+                    }
                 }
+                if let Ok(menu_table) = table.get::<mlua::Table>("menu") {
+                    let menubar = build_menu_from_lua(menu_table);
+                    app.set_menubar(Some(&menubar));
+                }
+                let load_provider = |p: &CssProvider| {
+                    if let Some(display) = Display::default() {
+                        gtk4::style_context_add_provider_for_display(
+                            &display,
+                            p,
+                            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+                        );
+                    }
+                };
+                if let Ok(rel_path) = table.get::<String>("css_path") {
+                    let mut css_file = main_file_path.parent().unwrap().to_path_buf();
+                    css_file.push(rel_path);
+                    if css_file.exists() {
+                        let provider = CssProvider::new();
+                        provider.load_from_path(css_file.to_str().unwrap());
+                        load_provider(&provider);
+                    } else {
+                        eprintln!("Warn: CSS file not found at {:?}", css_file);
+                    }
+                }
+                if let Ok(css_content) = table.get::<String>("css") {
+                    let provider = CssProvider::new();
+                    provider.load_from_data(&css_content);
+                    load_provider(&provider);
+                }
+                let first_item = table.raw_get(1);
+                let window_configs = if let Ok(mlua::Value::Table(_)) = first_item {
+                    table
+                        .sequence_values::<mlua::Table>()
+                        .filter_map(Result::ok)
+                        .map(mlua::Value::Table)
+                        .collect()
+                } else {
+                    vec![mlua::Value::Table(table.clone())]
+                };
+
+                let ink_global: mlua::Table = if let Ok(table) = lua.globals().get("ink") {
+                    table
+                } else {
+                    let table = lua
+                        .create_table()
+                        .expect("Failed to create ink global table");
+                    lua.globals()
+                        .set("ink", table.clone())
+                        .expect("Failed to set ink global table");
+                    table
+                };
+
+                let windows_table = lua
+                    .create_table()
+                    .expect("Failed to create Lua table for windows");
+
+                for config in window_configs {
+                    let wrapped = LuaWrapper(config);
+                    let builder = UiBuilder::new(lua.clone())
+                        .register_behavior(
+                            "GtkApplicationWindow",
+                            Box::new(WindowStrategy::new(windowed)),
+                        )
+                        .register_behavior("GtkWindow", Box::new(WindowStrategy::new(windowed)));
+                    match builder.build(&wrapped, &config_dir) {
+                        Ok(root) => {
+                            if let Some(w) = root.downcast_ref::<gtk4::Window>() {
+                                w.set_application(Some(app));
+
+                                if let Some(title_prop) = wrapped.get_property("title") {
+                                    if let Some(title_str) = title_prop.as_string() {
+                                        windows_table
+                                            .set(
+                                                title_str,
+                                                crate::scripting::widget_wrapper::LuaWidget(
+                                                    root.clone(),
+                                                ),
+                                            )
+                                            .expect("Failed to store window in Lua table");
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error::handle_error(app, "UI Builder Error", e.as_str());
+                        }
+                    }
+                }
+
+                ink_global
+                    .set("windows", windows_table)
+                    .expect("Failed to set ink.windows global");
+            } else {
+                error::handle_error(
+                    app,
+                    "Invalid Configuration",
+                    "Lua script must return a UI Table",
+                );
             }
-        });
+        }
+        Err(e) => {
+            error::handle_error(app, "Lua Execution Failed", &e.to_string());
+        }
     }
 }
 fn load_lua_script(lua: &Lua, path: &Path) -> mlua::Result<Function> {

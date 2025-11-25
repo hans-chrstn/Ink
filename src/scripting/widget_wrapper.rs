@@ -91,6 +91,10 @@ impl UserData for LuaWidget {
             this.0.set_visible(visible);
             Ok(())
         });
+
+        methods.add_method("is_visible", |_, this, ()| {
+            Ok(this.0.is_visible())
+        });
         methods.add_method("add_class", |_, this, class: String| {
             this.0.add_css_class(&class);
             Ok(())

@@ -3,20 +3,25 @@ use crate::scripting::traits::ScriptValue;
 use crate::ui::registry::Registry;
 use crate::ui::traits::WidgetBehavior;
 use gtk4::Widget;
-use gtk4::glib::Object;
+use gtk4::glib::{Object, GString};
 use gtk4::prelude::*;
 use std::collections::HashMap;
+use std::path::Path;
+use mlua::Lua;
+use std::rc::Rc;
 
 use crate::scripting::lua_driver::LuaWrapper;
 
 pub struct UiBuilder {
     behaviors: HashMap<String, Box<dyn WidgetBehavior<LuaWrapper>>>,
+    lua: Rc<Lua>,
 }
 
 impl UiBuilder {
-    pub fn new() -> Self {
+    pub fn new(lua: Rc<Lua>) -> Self {
         Self {
             behaviors: HashMap::new(),
+            lua,
         }
     }
 
@@ -29,11 +34,11 @@ impl UiBuilder {
         self
     }
 
-    pub fn build(&self, data: &LuaWrapper) -> Result<Widget, String> {
-        self.build_recursive(data)
+    pub fn build(&self, data: &LuaWrapper, config_dir: &Path) -> Result<Widget, String> {
+        self.build_recursive(data, config_dir)
     }
 
-    fn build_recursive(&self, data: &LuaWrapper) -> Result<Widget, String> {
+    fn build_recursive(&self, data: &LuaWrapper, config_dir: &Path) -> Result<Widget, String> {
         let type_name = data
             .get_property("type")
             .and_then(|v| v.as_string())
@@ -47,14 +52,39 @@ impl UiBuilder {
             .downcast::<Widget>()
             .map_err(|_| "Not a widget".to_string())?;
 
+
         if let Some(props) = data
             .get_property("properties")
             .and_then(|v| v.get_map_entries())
         {
             for (k, v) in props {
                 if let Some(pspec) = widget.find_property(&k) {
-                    if let Some(gval) = GenericConverter::to_gvalue(&v, pspec.value_type()) {
-                        widget.set_property(&k, gval);
+                    let is_path_prop = (k == "file" || k == "icon-name" || k == "file-name") && pspec.value_type() == GString::static_type();
+                    if is_path_prop {
+                        if let Some(path_str) = v.as_string() {
+                            let path = Path::new(&path_str);
+                            let final_path = if path.is_absolute() {
+                                path.to_path_buf()
+                            } else {
+                                config_dir.join(path)
+                            };
+
+                            let lua_string = self.lua.create_string(&*final_path.to_string_lossy())
+                                .map_err(|e| format!("Failed to create Lua string: {}", e))?;
+                            let resolved_path_wrapper = LuaWrapper(mlua::Value::String(lua_string));
+
+                            if let Some(gval) = GenericConverter::to_gvalue(&resolved_path_wrapper, pspec.value_type()) {
+                                widget.set_property(&k, gval);
+                            } else {
+                                return Err(format!("Failed to convert resolved path for property '{}' on type '{}'", k, type_name));
+                            }
+                        } else {
+                            return Err(format!("Property '{}' on type '{}' expects a string, but got non-string value", k, type_name));
+                        }
+                    } else {
+                        if let Some(gval) = GenericConverter::to_gvalue(&v, pspec.value_type()) {
+                            widget.set_property(&k, gval);
+                        }
                     }
                 } else {
                     return Err(format!("Property '{}' not found on type '{}'", k, type_name));
@@ -79,7 +109,7 @@ impl UiBuilder {
         {
             let strategy = Registry::get_strategy(&type_name, &widget);
             for child_data in children {
-                let child_widget = self.build_recursive(&child_data)?;
+                let child_widget = self.build_recursive(&child_data, config_dir)?;
                 strategy.add_child(&child_widget, &child_data);
             }
         }

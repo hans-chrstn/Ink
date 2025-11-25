@@ -3,30 +3,40 @@ use crate::scripting::stdlib;
 use crate::scripting::widget_wrapper::{LuaGType, LuaWidget};
 use crate::services;
 use crate::ui::builder::UiBuilder;
-use gtk4::gdk;
-use gtk4::glib::prelude::*;
-use gtk4::prelude::*;
-use gtk4::glib;
-use mlua::{Function, Lua, Result, Value};
-use std::rc::Rc;
 use crate::ui::strategy::WindowStrategy;
 use gtk4::Application;
+use gtk4::gdk;
+use gtk4::glib;
+use gtk4::glib::prelude::*;
+use gtk4::prelude::*;
+use mlua::{Function, Lua, Result, Value};
+use std::path::PathBuf;
+use std::rc::Rc;
 
-pub fn init(lua: Rc<Lua>, app: Application) -> Result<()> {
+pub fn init(lua: Rc<Lua>, app: Application, config_dir: PathBuf) -> Result<()> {
     let globals = lua.globals();
 
-    // Expose Gtk types
+    let build_ui_lua = lua.clone();
+
     let gtk_table = lua.create_table()?;
     gtk_table.set("Window", LuaGType(gtk4::Window::static_type()))?;
     globals.set("Gtk", gtk_table)?;
 
-    // Clipboard API
+    let ink_table = lua.create_table()?;
+    globals.set("ink", ink_table.clone())?;
+
+    let tray_table = lua.create_table()?;
+    ink_table.set("tray", tray_table)?;
+
     let clipboard_table = lua.create_table()?;
-    clipboard_table.set("set_text", lua.create_function(|_, text: String| {
-        let display = gdk::Display::default().expect("Could not get default display");
-        display.clipboard().set_text(&text);
-        Ok(())
-    })?)?;
+    clipboard_table.set(
+        "set_text",
+        lua.create_function(|_, text: String| {
+            let display = gdk::Display::default().expect("Could not get default display");
+            display.clipboard().set_text(&text);
+            Ok(())
+        })?,
+    )?;
 
     clipboard_table.set(
         "read_text",
@@ -58,16 +68,14 @@ pub fn init(lua: Rc<Lua>, app: Application) -> Result<()> {
 
     let build_ui = lua.create_function({
         let app = app.clone();
+        let config_dir = config_dir.clone();
         move |_, config: Value| {
             let wrapped = LuaWrapper(config);
-            let builder = UiBuilder::new()
-                .register_behavior(
-                    "GtkApplicationWindow",
-                    Box::new(WindowStrategy::new(false)),
-                )
+            let builder = UiBuilder::new(build_ui_lua.clone())
+                .register_behavior("GtkApplicationWindow", Box::new(WindowStrategy::new(false)))
                 .register_behavior("GtkWindow", Box::new(WindowStrategy::new(false)));
 
-            match builder.build(&wrapped) {
+            match builder.build(&wrapped, &config_dir) {
                 Ok(root) => {
                     if let Some(w) = root.downcast_ref::<gtk4::Window>() {
                         w.set_application(Some(&app));
@@ -96,7 +104,9 @@ pub fn init(lua: Rc<Lua>, app: Application) -> Result<()> {
         margins.set("top", 10)?;
         margins.set("right", 10)?;
         notif_table.set("margins", margins)?;
-        notif_table.set("css", r#"
+        notif_table.set(
+            "css",
+            r#"
             window {
                 background-color: rgba(30, 30, 40, 0.9);
                 border-radius: 12px;
@@ -112,7 +122,8 @@ pub fn init(lua: Rc<Lua>, app: Application) -> Result<()> {
             .body {
                 font-size: 1.0em;
             }
-        "#)?;
+        "#,
+        )?;
         let children_table = lua.create_table()?;
         let container = lua.create_table()?;
         container.set("type", "GtkBox")?;
@@ -124,7 +135,7 @@ pub fn init(lua: Rc<Lua>, app: Application) -> Result<()> {
         container_props.set("margin_start", 16)?;
         container_props.set("margin_end", 16)?;
         container.set("properties", container_props)?;
-        
+
         let container_children = lua.create_table()?;
         let summary_label = lua.create_table()?;
         summary_label.set("type", "GtkLabel")?;
@@ -145,7 +156,7 @@ pub fn init(lua: Rc<Lua>, app: Application) -> Result<()> {
             body_label.set("properties", body_props)?;
             container_children.raw_insert(2, body_label)?;
         }
-        
+
         container.set("children", container_children)?;
         children_table.raw_insert(1, container)?;
         notif_table.set("children", children_table)?;

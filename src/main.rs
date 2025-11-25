@@ -26,7 +26,6 @@ async fn main() {
             .join("ink")
             .join("main.lua");
         if default_path.exists() {
-            println!("Loading default config: {:?}", default_path);
             Some(default_path)
         } else {
             None
