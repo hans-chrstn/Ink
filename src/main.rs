@@ -8,12 +8,12 @@ mod ui;
 use crate::app::App;
 use crate::core::config::{Commands, Config};
 use crate::core::context::AppContext;
+use crate::ui::builder::UiBuilder;
 use gtk4::prelude::*;
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::env;
 use std::path::PathBuf;
-use crate::ui::builder::UiBuilder;
+use std::rc::Rc;
 
 #[tokio::main]
 async fn main() {
@@ -23,18 +23,22 @@ async fn main() {
         tools::generator::generate(dir).unwrap();
         return;
     }
-    let target_file = config.file.or_else(|| {
-        let home = env::var("HOME").ok()?;
-        let default_path = PathBuf::from(home)
+    let target_file = if config.file.is_some() {
+        config.file
+    } else {
+        let home_dir = env::var("HOME").unwrap_or_else(|_| "/".to_string());
+        let default_path = PathBuf::from(home_dir)
             .join(".config")
             .join("ink")
-            .join("main.lua");
+            .join("init.lua");
+
         if default_path.exists() {
             Some(default_path)
         } else {
+            eprintln!("Default config not found at: {:?}", default_path);
             None
         }
-    });
+    };
     if let Some(file) = target_file {
         let app = gtk4::Application::builder()
             .application_id("dev.ink.ui")
@@ -51,12 +55,18 @@ async fn main() {
         )
         .expect("Failed to initialize globals");
 
-        let mut app_instance = App::new(app.clone(), lua.clone(), context, config.windowed, ui_builder.clone());
+        let mut app_instance = App::new(
+            app.clone(),
+            lua.clone(),
+            context,
+            config.windowed,
+            ui_builder.clone(),
+        );
         app_instance.setup();
         app.run_with_args::<&str>(&[]);
     } else {
         eprintln!("Error: No file provided.");
         eprintln!("Usage: ink <file.lua>");
-        eprintln!("   Or: ink init (to create ~/.config/ink/main.lua)");
+        eprintln!("   Or: ink init (to create ~/.config/ink/init.lua)");
     }
 }

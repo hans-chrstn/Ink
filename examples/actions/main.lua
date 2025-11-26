@@ -4,6 +4,7 @@ return {
 		title = "Actions and Menus Example",
 		default_width = 400,
 		default_height = 300,
+		visible = true,
 	},
 
 	actions = {

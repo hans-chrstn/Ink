@@ -6,13 +6,14 @@ return {
 		title = "Ink Feature Test",
 		default_width = 500,
 		default_height = 700,
+		visible = true,
+		css_classes = { "my-window" },
 	},
 	css = [[
         .green-button { background: #2ec27e; color: white; }
         .red-button { background: #e01b24; color: white; }
         label { font-size: 16px; }
     ]],
-	css_classes = { "my-window" },
 	children = {
 		{
 			type = "GtkBox",

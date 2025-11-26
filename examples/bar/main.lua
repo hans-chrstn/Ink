@@ -1,7 +1,6 @@
 return {
 	type = "GtkApplicationWindow",
-	
-	
+
 	css = [[
         button {
             background-color: gray;
@@ -39,6 +38,7 @@ return {
 		title = "My Ink Bar",
 		default_height = 40,
 		css_classes = { "my-window" },
+		visible = true,
 	},
 	children = {
 		{

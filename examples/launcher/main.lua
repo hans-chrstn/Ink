@@ -14,6 +14,7 @@ local function create_app_button(app)
 			valign = "start",
 			has_frame = false,
 			hexpand = true,
+			visible = true,
 		},
 		children = {
 			{

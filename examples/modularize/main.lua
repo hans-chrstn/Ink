@@ -12,6 +12,7 @@ return {
 		title = "Ink Feature Demo",
 		default_width = cfg.win_width,
 		default_height = cfg.win_height,
+		visible = true,
 	},
 	children = {
 		{

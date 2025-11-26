@@ -38,6 +38,9 @@ return {
 	layer = "overlay",
 	anchors = { bottom = true, left = false, right = false, top = false },
 	margins = { bottom = 100 },
+	properties = {
+		visible = true,
+	},
 	css = [[
         window { background-color: transparent; }
         .osd-box { 

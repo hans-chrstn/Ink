@@ -128,6 +128,7 @@ return {
 		title = "My Ink Bar",
 		default_height = 40,
 		css_classes = { "my-window" },
+    visible = true,
 	},
 	children = {
 		{
@@ -148,7 +149,7 @@ return {
 				{
 					type = "GtkButton",
 					properties = { label = "Exit" },
-					signals = { clicked = function() print("Exit clicked") end },
+					signals = { clicked = exit() },
 				},
 			},
 		},

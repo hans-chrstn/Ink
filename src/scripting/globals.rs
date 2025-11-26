@@ -233,7 +233,7 @@ fn init_utility_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
         glib::timeout_add_local_once(std::time::Duration::from_millis(ms as u64), move || {
             if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
                 if let Err(e) = func.call::<()>(()) {
-                    eprintln!("setTimeout Error: {}", e);
+                    eprintln!("set_timeout Error: {}", e);
                 }
             }
         });

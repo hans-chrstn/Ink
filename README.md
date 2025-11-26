@@ -29,7 +29,7 @@ cp target/release/ink /usr/local/bin/
 Run wiht a specific configuration file:
 
 ```bash
-ink path/to/main.lua
+ink path/to/init.lua
 ```
 
 Initialize a default configuration at `~/.config/ink/`
@@ -38,7 +38,7 @@ Initialize a default configuration at `~/.config/ink/`
 ink init
 ```
 
-If no file is provided, Ink looks for ~/.config/ink/main.lua
+If no file is provided, Ink looks for ~/.config/ink/init.lua
 
 More info using `ink -h`
 

@@ -7,7 +7,7 @@ use crate::ui::strategy::WindowStrategy;
 use gio;
 use gtk4::gdk::Display;
 use gtk4::{Application, CssProvider, prelude::*};
-use mlua::{Function, Lua, Table};
+use mlua::{Function, Lua};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -92,12 +92,6 @@ fn load_and_build_ui(
         .unwrap_or_else(|| Path::new("."))
         .to_path_buf();
 
-    if let Some(parent) = main_file_path.parent().and_then(|p| p.to_str()) {
-        let _ = lua.globals().get::<Table>("package").unwrap().set(
-            "path",
-            format!("{};{}/?.lua;{}/?/init.lua", "", parent, parent),
-        );
-    }
     if let Some(main_file_str) = main_file_path.to_str() {
         lua.globals()
             .set("INK_MAIN_FILE_PATH", main_file_str)
