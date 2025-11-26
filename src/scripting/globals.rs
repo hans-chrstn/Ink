@@ -9,32 +9,31 @@ use gtk4::glib;
 use gtk4::glib::prelude::*;
 use gtk4::prelude::*;
 use mlua::{Function, Lua, Result, Value};
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::cell::RefCell;
 
-pub fn init(
-    lua: Rc<Lua>,
-    app: Application,
-    config_dir: PathBuf,
-    ui_builder: Rc<RefCell<UiBuilder>>,
-) -> Result<()> {
-    let globals = lua.globals();
-
+fn init_gtk_bindings(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
     let gtk_table = lua.create_table()?;
     gtk_table.set("Window", LuaGType(gtk4::Window::static_type()))?;
     globals.set("Gtk", gtk_table)?;
+    Ok(())
+}
 
-    let ink_table = lua.create_table()?;
-    globals.set("ink", ink_table.clone())?;
-
+fn init_ink_core_functions(
+    lua: &Rc<Lua>,
+    ink_table: &mlua::Table,
+    ui_builder: Rc<RefCell<UiBuilder>>,
+) -> Result<()> {
     ink_table.set(
         "get_widget_by_id",
         lua.create_function({
             let ui_builder = ui_builder.clone();
             move |lua, id: String| {
                 if let Some(widget) = ui_builder.borrow().get_widget_by_id(&id) {
-                    Ok(mlua::Value::UserData(lua.create_userdata(LuaWidget(widget))?))
+                    Ok(mlua::Value::UserData(
+                        lua.create_userdata(LuaWidget(widget))?,
+                    ))
                 } else {
                     Ok(mlua::Value::Nil)
                 }
@@ -47,11 +46,12 @@ pub fn init(
 
     ink_table.set(
         "markdown_to_pango",
-        lua.create_function(|_, markdown: String| {
-            Ok(stdlib::markdown_to_pango(&markdown))
-        })?,
+        lua.create_function(|_, markdown: String| Ok(stdlib::markdown_to_pango(&markdown)))?,
     )?;
+    Ok(())
+}
 
+fn init_clipboard_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
     let clipboard_table = lua.create_table()?;
     clipboard_table.set(
         "set_text",
@@ -89,7 +89,16 @@ pub fn init(
         })?,
     )?;
     globals.set("Clipboard", clipboard_table)?;
+    Ok(())
+}
 
+fn init_ui_builder_function(
+    lua: &Rc<Lua>,
+    globals: &mlua::Table,
+    app: Application,
+    config_dir: PathBuf,
+    ui_builder: Rc<RefCell<UiBuilder>>,
+) -> Result<()> {
     let build_ui = lua.create_function({
         let app = app.clone();
         let config_dir = config_dir.clone();
@@ -110,7 +119,10 @@ pub fn init(
         }
     })?;
     globals.set("build_ui", build_ui)?;
+    Ok(())
+}
 
+fn init_notification_function(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
     let notify = lua.create_function(|lua, (summary, body): (String, Option<String>)| {
         let build_ui = lua.globals().get::<Function>("build_ui")?;
         let notif_table = lua.create_table()?;
@@ -191,6 +203,10 @@ pub fn init(
         Ok(())
     })?;
     globals.set("notify", notify)?;
+    Ok(())
+}
+
+fn init_utility_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
     let exit = lua.create_function(|_, code: Option<i32>| -> Result<()> {
         std::process::exit(code.unwrap_or(0));
     })?;
@@ -242,47 +258,90 @@ pub fn init(
         })?;
         globals.set("exec_async", exec_async)?;
     }
-    let fetch = lua.create_function(|_, (method, uri, headers, body): (String, String, Option<mlua::Table>, Option<String>)| {
-        let headers_map: Option<std::collections::HashMap<String, String>> = headers.map(|t| {
-            t.pairs::<String, String>().filter_map(Result::ok).collect()
-        });
-        stdlib::fetch(&method, &uri, headers_map, body).map_err(mlua::Error::RuntimeError)
-    })?;
+    let fetch = lua.create_function(
+        |_, (method, uri, headers, body): (String, String, Option<mlua::Table>, Option<String>)| {
+            let headers_map: Option<std::collections::HashMap<String, String>> =
+                headers.map(|t| t.pairs::<String, String>().filter_map(Result::ok).collect());
+            stdlib::fetch(&method, &uri, headers_map, body).map_err(mlua::Error::RuntimeError)
+        },
+    )?;
     globals.set("fetch", fetch)?;
 
-    let fetch_async = lua.create_function(|lua, (method, uri, headers, body, callback): (String, String, Option<mlua::Table>, Option<String>, Function)| {
-        let headers_map: Option<std::collections::HashMap<String, String>> = headers.map(|t| {
-            t.pairs::<String, String>().filter_map(Result::ok).collect()
-        });
+    let fetch_async = lua.create_function(
+        |lua,
+         (method, uri, headers, body, callback): (
+            String,
+            String,
+            Option<mlua::Table>,
+            Option<String>,
+            Function,
+        )| {
+            let headers_map: Option<std::collections::HashMap<String, String>> =
+                headers.map(|t| t.pairs::<String, String>().filter_map(Result::ok).collect());
 
-        let lua = lua.clone();
-        let cb_key = lua.create_registry_value(callback)?;
+            let lua = lua.clone();
+            let cb_key = lua.create_registry_value(callback)?;
 
-        glib::MainContext::default().spawn_local(async move {
-            let result = stdlib::fetch_async(method, uri, headers_map, body).await;
-            if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
-                let lua_result_table = lua.create_table().expect("Failed to create Lua table for result");
+            glib::MainContext::default().spawn_local(async move {
+                let result = stdlib::fetch_async(method, uri, headers_map, body).await;
+                if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
+                    let lua_result_table = lua
+                        .create_table()
+                        .expect("Failed to create Lua table for result");
 
-                match result {
-                    Ok(s) => {
-                        lua_result_table.set("ok", s).expect("Failed to set 'ok' field");
-                    },
-                    Err(e) => {
-                        lua_result_table.set("err", e).expect("Failed to set 'err' field");
+                    match result {
+                        Ok(s) => {
+                            lua_result_table
+                                .set("ok", s)
+                                .expect("Failed to set 'ok' field");
+                        }
+                        Err(e) => {
+                            lua_result_table
+                                .set("err", e)
+                                .expect("Failed to set 'err' field");
+                        }
                     }
+                    func.call::<()>(lua_result_table)
+                        .expect("Error in Lua fetch_async callback");
                 }
-                func.call::<()>(lua_result_table).expect("Error in Lua fetch_async callback");
-            }
-        });
+            });
 
-        Ok(())
-    })?;
+            Ok(())
+        },
+    )?;
     globals.set("fetch_async", fetch_async)?;
     let spawn = lua.create_function(|_, cmd: String| {
         stdlib::spawn(cmd);
         Ok(())
     })?;
     globals.set("spawn", spawn)?;
+    Ok(())
+}
+
+pub fn init(
+    lua: Rc<Lua>,
+    app: Application,
+    config_dir: PathBuf,
+    ui_builder: Rc<RefCell<UiBuilder>>,
+) -> Result<()> {
+    let globals = lua.globals();
+
+    let ink_table = lua.create_table()?;
+    globals.set("ink", ink_table.clone())?;
+
+    init_gtk_bindings(&lua, &globals)?;
+    init_ink_core_functions(&lua, &ink_table, ui_builder.clone())?;
+    init_clipboard_functions(&lua, &globals)?;
+    init_ui_builder_function(
+        &lua,
+        &globals,
+        app.clone(),
+        config_dir.clone(),
+        ui_builder.clone(),
+    )?;
+    init_notification_function(&lua, &globals)?;
+    init_utility_functions(&lua, &globals)?;
+
     services::init(lua.clone())?;
     Ok(())
 }

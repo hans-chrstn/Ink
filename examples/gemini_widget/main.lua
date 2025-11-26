@@ -134,8 +134,6 @@ local function send_message()
 		if response.err then
 			response_text_to_add = "Error: " .. response.err
 		else
-			print("Raw API Response (response.ok):")
-			print(response.ok)
 			local data = ink.json.parse(response.ok)
 
 			if data and data.candidates and #data.candidates > 0 then

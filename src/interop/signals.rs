@@ -33,8 +33,10 @@ impl SignalConnector {
                     ScriptArg::Number(n) => Some(n.to_value()),
                     ScriptArg::String(s) => Some(s.to_value()),
                     ScriptArg::Nil => {
-                        if signal_name == "state-set" || signal_name == "focus-out" {
+                        if signal_name == "state-set" {
                             Some(true.to_value())
+                        } else if signal_name == "focus-out" {
+                            Some(false.to_value())
                         } else {
                             None
                         }
