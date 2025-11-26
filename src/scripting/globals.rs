@@ -3,7 +3,6 @@ use crate::scripting::stdlib;
 use crate::scripting::widget_wrapper::{LuaGType, LuaWidget};
 use crate::services;
 use crate::ui::builder::UiBuilder;
-use crate::ui::strategy::WindowStrategy;
 use gtk4::Application;
 use gtk4::gdk;
 use gtk4::glib;
@@ -12,11 +11,15 @@ use gtk4::prelude::*;
 use mlua::{Function, Lua, Result, Value};
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::cell::RefCell;
 
-pub fn init(lua: Rc<Lua>, app: Application, config_dir: PathBuf) -> Result<()> {
+pub fn init(
+    lua: Rc<Lua>,
+    app: Application,
+    config_dir: PathBuf,
+    ui_builder: Rc<RefCell<UiBuilder>>,
+) -> Result<()> {
     let globals = lua.globals();
-
-    let build_ui_lua = lua.clone();
 
     let gtk_table = lua.create_table()?;
     gtk_table.set("Window", LuaGType(gtk4::Window::static_type()))?;
@@ -24,6 +27,20 @@ pub fn init(lua: Rc<Lua>, app: Application, config_dir: PathBuf) -> Result<()> {
 
     let ink_table = lua.create_table()?;
     globals.set("ink", ink_table.clone())?;
+
+    ink_table.set(
+        "get_widget_by_id",
+        lua.create_function({
+            let ui_builder = ui_builder.clone();
+            move |lua, id: String| {
+                if let Some(widget) = ui_builder.borrow().get_widget_by_id(&id) {
+                    Ok(mlua::Value::UserData(lua.create_userdata(LuaWidget(widget))?))
+                } else {
+                    Ok(mlua::Value::Nil)
+                }
+            }
+        })?,
+    )?;
 
     let tray_table = lua.create_table()?;
     ink_table.set("tray", tray_table)?;
@@ -69,13 +86,11 @@ pub fn init(lua: Rc<Lua>, app: Application, config_dir: PathBuf) -> Result<()> {
     let build_ui = lua.create_function({
         let app = app.clone();
         let config_dir = config_dir.clone();
+        let ui_builder = ui_builder.clone();
         move |_, config: Value| {
             let wrapped = LuaWrapper(config);
-            let builder = UiBuilder::new(build_ui_lua.clone())
-                .register_behavior("GtkApplicationWindow", Box::new(WindowStrategy::new(false)))
-                .register_behavior("GtkWindow", Box::new(WindowStrategy::new(false)));
 
-            match builder.build(&wrapped, &config_dir) {
+            match ui_builder.borrow().build(&wrapped, &config_dir) {
                 Ok(root) => {
                     if let Some(w) = root.downcast_ref::<gtk4::Window>() {
                         w.set_application(Some(&app));
@@ -188,6 +203,7 @@ pub fn init(lua: Rc<Lua>, app: Application, config_dir: PathBuf) -> Result<()> {
         Ok(())
     })?;
     globals.set("set_interval", set_interval)?;
+
     let set_timeout = lua.create_function(|lua, (ms, callback): (u32, Function)| {
         let lua = lua.clone();
         let cb_key = lua.create_registry_value(callback)?;
@@ -219,25 +235,42 @@ pub fn init(lua: Rc<Lua>, app: Application, config_dir: PathBuf) -> Result<()> {
         })?;
         globals.set("exec_async", exec_async)?;
     }
-    let fetch = lua
-        .create_function(|_, url: String| stdlib::fetch(&url).map_err(mlua::Error::RuntimeError))?;
+    let fetch = lua.create_function(|_, (method, uri, headers, body): (String, String, Option<mlua::Table>, Option<String>)| {
+        let headers_map: Option<std::collections::HashMap<String, String>> = headers.map(|t| {
+            t.pairs::<String, String>().filter_map(Result::ok).collect()
+        });
+        stdlib::fetch(&method, &uri, headers_map, body).map_err(mlua::Error::RuntimeError)
+    })?;
     globals.set("fetch", fetch)?;
-    {
+
+    let fetch_async = lua.create_function(|lua, (method, uri, headers, body, callback): (String, String, Option<mlua::Table>, Option<String>, Function)| {
+        let headers_map: Option<std::collections::HashMap<String, String>> = headers.map(|t| {
+            t.pairs::<String, String>().filter_map(Result::ok).collect()
+        });
+
         let lua = lua.clone();
-        let fetch_async =
-            lua.create_function(move |lua, (url, callback): (String, Function)| {
-                let lua = lua.clone();
-                let cb_key = lua.create_registry_value(callback)?;
-                glib::MainContext::default().spawn_local(async move {
-                    let result = stdlib::fetch_async(url).await;
-                    if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
-                        let _ = func.call::<()>(result);
+        let cb_key = lua.create_registry_value(callback)?;
+
+        glib::MainContext::default().spawn_local(async move {
+            let result = stdlib::fetch_async(method, uri, headers_map, body).await;
+            if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
+                let lua_result_table = lua.create_table().expect("Failed to create Lua table for result");
+
+                match result {
+                    Ok(s) => {
+                        lua_result_table.set("ok", s).expect("Failed to set 'ok' field");
+                    },
+                    Err(e) => {
+                        lua_result_table.set("err", e).expect("Failed to set 'err' field");
                     }
-                });
-                Ok(())
-            })?;
-        globals.set("fetch_async", fetch_async)?;
-    }
+                }
+                func.call::<()>(lua_result_table).expect("Error in Lua fetch_async callback");
+            }
+        });
+
+        Ok(())
+    })?;
+    globals.set("fetch_async", fetch_async)?;
     let spawn = lua.create_function(|_, cmd: String| {
         stdlib::spawn(cmd);
         Ok(())

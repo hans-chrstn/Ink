@@ -1,6 +1,5 @@
 use crate::core::context::AppContext;
 use crate::core::error;
-use crate::scripting::globals;
 use crate::scripting::lua_driver::LuaWrapper;
 use crate::scripting::traits::ScriptValue;
 use crate::ui::builder::UiBuilder;
@@ -12,28 +11,31 @@ use mlua::{Function, Lua, Table};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::sync::Arc;
+
 pub struct App {
     app: Application,
     lua: Rc<Lua>,
     context: Arc<AppContext>,
     windowed: bool,
+    ui_builder: Rc<RefCell<UiBuilder>>,
 }
+
 impl App {
-    pub fn new(app: Application, context: AppContext, windowed: bool) -> Self {
-        let lua = Rc::new(Lua::new());
-        let config_dir = context
-            .main_file_path
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .to_path_buf();
-        globals::init(lua.clone(), app.clone(), config_dir.clone())
-            .expect("Failed to initialize Lua globals");
+    pub fn new(
+        app: Application,
+        lua: Rc<Lua>,
+        context: AppContext,
+        windowed: bool,
+        ui_builder: Rc<RefCell<UiBuilder>>,
+    ) -> Self {
         Self {
             app,
             lua,
             context: Arc::new(context),
             windowed,
+            ui_builder,
         }
     }
 
@@ -41,13 +43,15 @@ impl App {
         let lua = self.lua.clone();
         let context = self.context.clone();
         let windowed = self.windowed;
+        let ui_builder = self.ui_builder.clone();
 
         let app_clone_for_reload = self.app.clone();
         let lua_clone_for_reload = self.lua.clone();
         let context_clone_for_reload = self.context.clone();
+        let ui_builder_clone_for_reload = self.ui_builder.clone();
 
         self.app.connect_activate(move |app| {
-            load_and_build_ui(app, &lua, &context, windowed);
+            load_and_build_ui(app, &lua, &context, windowed, ui_builder.clone());
         });
 
         if let Ok(ink_global) = self.lua.globals().get::<mlua::Table>("ink") {
@@ -64,6 +68,7 @@ impl App {
                                 &lua_clone_for_reload,
                                 &context_clone_for_reload,
                                 windowed,
+                                ui_builder_clone_for_reload.clone(),
                             );
                             Ok(())
                         })
@@ -74,7 +79,13 @@ impl App {
     }
 }
 
-fn load_and_build_ui(app: &Application, lua: &Rc<Lua>, context: &Arc<AppContext>, windowed: bool) {
+fn load_and_build_ui(
+    app: &Application,
+    lua: &Rc<Lua>,
+    context: &Arc<AppContext>,
+    windowed: bool,
+    ui_builder: Rc<RefCell<UiBuilder>>,
+) {
     let main_file_path = &context.main_file_path;
     let config_dir = main_file_path
         .parent()
@@ -119,6 +130,8 @@ fn load_and_build_ui(app: &Application, lua: &Rc<Lua>, context: &Arc<AppContext>
                     "keyboard_mode",
                     "actions",
                     "menu",
+                    "id",
+                    "realize",
                 ];
                 for pair in table.pairs::<String, mlua::Value>() {
                     if let Ok((key, _)) = pair {
@@ -210,8 +223,9 @@ fn load_and_build_ui(app: &Application, lua: &Rc<Lua>, context: &Arc<AppContext>
 
                 for config in window_configs {
                     let wrapped = LuaWrapper(config);
-                    let builder = UiBuilder::new(lua.clone())
-                        .register_behavior(
+                    
+                    let mut builder = ui_builder.borrow_mut();
+                    builder.register_behavior(
                             "GtkApplicationWindow",
                             Box::new(WindowStrategy::new(windowed)),
                         )

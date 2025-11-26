@@ -9,8 +9,12 @@ use crate::app::App;
 use crate::core::config::{Commands, Config};
 use crate::core::context::AppContext;
 use gtk4::prelude::*;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::env;
 use std::path::PathBuf;
+use crate::ui::builder::UiBuilder;
+
 #[tokio::main]
 async fn main() {
     ui::catalog::init();
@@ -35,8 +39,19 @@ async fn main() {
         let app = gtk4::Application::builder()
             .application_id("dev.ink.ui")
             .build();
-        let context = AppContext::new(file);
-        let mut app_instance = App::new(app.clone(), context, config.windowed);
+        let lua = Rc::new(mlua::Lua::new());
+        let ui_builder = Rc::new(RefCell::new(UiBuilder::new(lua.clone())));
+        let context = AppContext::new(file.clone());
+
+        scripting::globals::init(
+            lua.clone(),
+            app.clone(),
+            file.parent().unwrap_or(&PathBuf::from(".")).to_path_buf(),
+            ui_builder.clone(),
+        )
+        .expect("Failed to initialize globals");
+
+        let mut app_instance = App::new(app.clone(), lua.clone(), context, config.windowed, ui_builder.clone());
         app_instance.setup();
         app.run_with_args::<&str>(&[]);
     } else {

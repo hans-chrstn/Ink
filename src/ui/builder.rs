@@ -9,12 +9,14 @@ use std::collections::HashMap;
 use std::path::Path;
 use mlua::Lua;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 use crate::scripting::lua_driver::LuaWrapper;
 
 pub struct UiBuilder {
     behaviors: HashMap<String, Box<dyn WidgetBehavior<LuaWrapper>>>,
     lua: Rc<Lua>,
+    widgets_by_id: RefCell<HashMap<String, Widget>>,
 }
 
 impl UiBuilder {
@@ -22,20 +24,26 @@ impl UiBuilder {
         Self {
             behaviors: HashMap::new(),
             lua,
+            widgets_by_id: RefCell::new(HashMap::new()),
         }
     }
 
     pub fn register_behavior(
-        mut self,
+        &mut self,
         type_name: &str,
         behavior: Box<dyn WidgetBehavior<LuaWrapper>>,
-    ) -> Self {
+    ) -> &mut Self {
         self.behaviors.insert(type_name.to_string(), behavior);
         self
     }
 
     pub fn build(&self, data: &LuaWrapper, config_dir: &Path) -> Result<Widget, String> {
-        self.build_recursive(data, config_dir)
+        let root_widget = self.build_recursive(data, config_dir)?;
+        Ok(root_widget)
+    }
+
+    pub fn get_widget_by_id(&self, id: &str) -> Option<Widget> {
+        self.widgets_by_id.borrow().get(id).cloned()
     }
 
     fn build_recursive(&self, data: &LuaWrapper, config_dir: &Path) -> Result<Widget, String> {
@@ -51,6 +59,12 @@ impl UiBuilder {
         let widget = object
             .downcast::<Widget>()
             .map_err(|_| "Not a widget".to_string())?;
+
+        if let Some(id_val) = data.get_property("id") {
+            if let Some(id_str) = id_val.as_string() {
+                self.widgets_by_id.borrow_mut().insert(id_str, widget.clone());
+            }
+        }
 
 
         if let Some(props) = data

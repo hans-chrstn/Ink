@@ -4,6 +4,7 @@ use gtk4::glib::prelude::*;
 use gtk4::glib::Type as GType;
 use gtk4::prelude::*;
 use mlua::{Error, FromLua, Function, Lua, UserData, UserDataMethods, Value};
+
 #[derive(Clone, Copy)]
 pub struct LuaGType(pub GType);
 impl UserData for LuaGType {}
@@ -20,6 +21,7 @@ impl FromLua for LuaGType {
         Ok(*w)
     }
 }
+
 #[derive(Clone)]
 pub struct LuaWidget(pub gtk4::Widget);
 impl FromLua for LuaWidget {
@@ -35,6 +37,24 @@ impl FromLua for LuaWidget {
         Ok(w.clone())
     }
 }
+
+#[derive(Clone)]
+pub struct LuaAdjustment(pub gtk4::Adjustment);
+impl UserData for LuaAdjustment {
+    fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("get_value", |_, this, ()| {
+            Ok(this.0.value())
+        });
+        methods.add_method("set_value", |_, this, value: f64| {
+            this.0.set_value(value);
+            Ok(())
+        });
+        methods.add_method("get_upper", |_, this, ()| {
+            Ok(this.0.upper())
+        });
+    }
+}
+
 fn find_child_by_name_recursive(parent: &gtk4::Widget, name: &str) -> Option<gtk4::Widget> {
     let mut child = parent.first_child();
     while let Some(c) = child {
@@ -48,6 +68,7 @@ fn find_child_by_name_recursive(parent: &gtk4::Widget, name: &str) -> Option<gtk
     }
     None
 }
+
 impl UserData for LuaWidget {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("destroy", |_, this, ()| {
@@ -159,6 +180,24 @@ impl UserData for LuaWidget {
                 range.set_increments(step, page);
             }
             Ok(())
+        });
+        methods.add_method("get_parent", |_, this, ()| {
+            if let Some(parent) = this.0.parent() {
+                Ok(Some(LuaWidget(parent)))
+            } else {
+                Ok(None)
+            }
+        });
+        methods.add_method("queue_draw", |_, this, ()| {
+            this.0.queue_draw();
+            Ok(())
+        });
+        methods.add_method("get_vadjustment", |lua, this, ()| {
+            if let Some(scrolled_window) = this.0.downcast_ref::<gtk4::ScrolledWindow>() {
+                let adj = scrolled_window.vadjustment();
+                return Ok(mlua::Value::UserData(lua.create_userdata(LuaAdjustment(adj))?));
+            }
+            Ok(mlua::Value::Nil)
         });
         methods.add_method(
             "add_controller_motion",
