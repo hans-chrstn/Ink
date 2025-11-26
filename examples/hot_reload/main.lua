@@ -1,5 +1,5 @@
 local function toggle_launcher()
-	local launcher = ink.windows.Launcher
+	local launcher = app.windows.Launcher
 	if launcher then
 		local is_visible = launcher:is_visible()
 		launcher:set_visible(not is_visible)
@@ -14,19 +14,19 @@ if main_file_path then
 	Files.watch(main_file_path, function(event)
 		if event == "changed" then
 			print("Config file changed! Reloading...")
-			ink.reload()
+			app.reload()
 		end
 	end)
 end
 
 return {
 	{
-		title = "Bar",
 		default_height = 40,
 		window_mode = "layer_shell",
 		layer = "top",
 		anchors = { top = true, left = true, right = true, bottom = false },
 		properties = {
+			title = "Bar",
 			visible = true,
 		},
 		children = {
@@ -54,12 +54,12 @@ return {
 		},
 	},
 	{
-		title = "Launcher",
 		default_width = 400,
 		default_height = 300,
 		window_mode = "layer_shell",
 		layer = "overlay",
 		properties = {
+			title = "Launcher",
 			visible = false,
 		},
 		children = {

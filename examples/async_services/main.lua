@@ -3,11 +3,9 @@ local is_green = false
 return {
 	type = "GtkApplicationWindow",
 	properties = {
-		title = "Ink Feature Test",
 		default_width = 500,
 		default_height = 700,
 		visible = true,
-		css_classes = { "my-window" },
 	},
 	css = [[
         .green-button { background: #2ec27e; color: white; }
@@ -65,12 +63,10 @@ return {
 					signals = {
 						clicked = function(self)
 							if is_green then
-								print("Turning off...")
 								self:remove_class("green-button")
 								self:set_property("label", "Click to turn Green")
 								is_green = false
 							else
-								print("Turning on...")
 								self:add_class("green-button")
 								self:set_property("label", "I am Green Now!")
 								is_green = true
@@ -83,7 +79,6 @@ return {
 					properties = { active = false, valign = "center" },
 					signals = {
 						state_set = function(self, state)
-							print("Switch state changed to: " .. tostring(state))
 							if state then
 								self:add_class("red-button")
 							else
@@ -104,7 +99,6 @@ return {
 					signals = {
 						clicked = function(self)
 							local cap, status = System.get_battery()
-							print("Battery: " .. cap .. "% " .. status)
 							self:set_property("label", "Checking Wifi...")
 							exec_async("nmcli -t -f active,ssid dev wifi | grep '^yes' | cut -d: -f2", function(ssid)
 								print("Wifi SSID: " .. ssid)
@@ -117,9 +111,12 @@ return {
 					properties = { label = "Test HTTP Fetch" },
 					signals = {
 						clicked = function()
-							print("fetching ip...")
-							fetch_async("https://api.ipify.org", function(ip)
-								print("My IP: " .. ip)
+							fetch_async("GET", "https://api.ipify.org", nil, nil, function(result)
+								if result.ok then
+									print("My IP: " .. result.ok)
+								else
+									print("Fetch Error: " .. result.err)
+								end
 							end)
 						end,
 					},

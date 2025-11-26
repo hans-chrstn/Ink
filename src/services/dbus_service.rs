@@ -20,6 +20,7 @@ pub struct Notification {
     app_name: String,
     summary: String,
     body: String,
+    timeout: i32,
 }
 
 #[derive(Debug)]
@@ -46,12 +47,13 @@ impl NotificationServer {
         body: String,
         _actions: Vec<String>,
         _hints: HashMap<String, Value<'_>>,
-        _expire_timeout: i32,
+        expire_timeout: i32,
     ) -> u32 {
         let notif = Notification {
             app_name,
             summary,
             body,
+            timeout: expire_timeout,
         };
         self.sender.send(DbusUpdate::Notification(notif)).unwrap();
         1
@@ -159,12 +161,13 @@ async fn run_server(sender: Sender<DbusUpdate>) -> Result<(), Box<dyn Error>> {
 
 fn handle_notification_in_lua(lua: &Lua, notification: Notification) -> mlua::Result<()> {
     let globals = lua.globals();
-    let ink_table: Table = globals.get("ink")?;
-    if let Ok(on_notification) = ink_table.get::<Function>("on_notification") {
+    let app_table: Table = globals.get("app")?;
+    if let Ok(on_notification) = app_table.get::<Function>("on_notification") {
         let params = lua.create_table()?;
         params.set("app_name", notification.app_name.as_str())?;
         params.set("summary", notification.summary.as_str())?;
         params.set("body", notification.body.as_str())?;
+        params.set("timeout", notification.timeout)?;
         on_notification.call::<()>(params)?;
     }
     Ok(())
@@ -172,8 +175,8 @@ fn handle_notification_in_lua(lua: &Lua, notification: Notification) -> mlua::Re
 
 fn handle_tray_update_in_lua(lua: &Lua, update: TrayUpdate) -> mlua::Result<()> {
     let globals = lua.globals();
-    let ink_table: Table = globals.get("ink")?;
-    if let Ok(tray_table) = ink_table.get::<Table>("tray") {
+    let app_table: Table = globals.get("app")?;
+    if let Ok(tray_table) = app_table.get::<Table>("tray") {
         match update {
             TrayUpdate::ItemRegistered(service) => {
                 if let Ok(callback) = tray_table.get::<Function>("on_item_added") {

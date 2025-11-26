@@ -1,11 +1,11 @@
 return {
 	{
-		title = "First Window",
 		anchors = { top = true, left = true, right = true },
 		auto_exclusive_zone = true,
 		window_mode = "layer_shell",
 		layer = "top",
 		properties = {
+			title = "First Window",
 			visible = true,
 			default_width = 300,
 			default_height = 200,
@@ -20,12 +20,12 @@ return {
 		},
 	},
 	{
-		title = "Second Window",
 		anchors = { top = false, left = true, right = true, bottom = true },
 		auto_exclusive_zone = true,
 		window_mode = "layer_shell",
 		layer = "top",
 		properties = {
+			title = "Second Window",
 			visible = true,
 			default_width = 350,
 			default_height = 250,

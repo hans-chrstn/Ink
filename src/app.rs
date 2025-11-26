@@ -6,7 +6,7 @@ use crate::ui::builder::UiBuilder;
 use crate::ui::strategy::WindowStrategy;
 use gio;
 use gtk4::gdk::Display;
-use gtk4::{Application, CssProvider, prelude::*};
+use gtk4::{prelude::*, Application, CssProvider};
 use mlua::{Function, Lua};
 use std::cell::RefCell;
 use std::fs;
@@ -54,8 +54,8 @@ impl App {
             load_and_build_ui(app, &lua, &context, windowed, ui_builder.clone());
         });
 
-        if let Ok(ink_global) = self.lua.globals().get::<mlua::Table>("ink") {
-            ink_global
+        if let Ok(app_global) = self.lua.globals().get::<mlua::Table>("app") {
+            app_global
                 .set(
                     "reload",
                     self.lua
@@ -215,15 +215,15 @@ fn load_and_build_ui(
                     vec![mlua::Value::Table(table.clone())]
                 };
 
-                let ink_global: mlua::Table = if let Ok(table) = lua.globals().get("ink") {
+                let app_global: mlua::Table = if let Ok(table) = lua.globals().get("app") {
                     table
                 } else {
                     let table = lua
                         .create_table()
-                        .expect("Failed to create ink global table");
+                        .expect("Failed to create app global table");
                     lua.globals()
-                        .set("ink", table.clone())
-                        .expect("Failed to set ink global table");
+                        .set("app", table.clone())
+                        .expect("Failed to set app global table");
                     table
                 };
 
@@ -266,9 +266,30 @@ fn load_and_build_ui(
                     }
                 }
 
-                ink_global
+                app_global
                     .set("windows", windows_table)
-                    .expect("Failed to set ink.windows global");
+                    .expect("Failed to set app.windows global");
+
+                if let Err(e) = UiBuilder::register_get_widget_by_id_lua_function(lua, &app_global)
+                {
+                    error::handle_error(
+                        app,
+                        "Lua Error",
+                        &format!("Failed to register get_widget_by_id: {}", e),
+                    );
+                    return;
+                }
+
+                if let Ok(on_ready_fn) = app_global.get::<mlua::Function>("on_ready") {
+                    if let Err(e) = on_ready_fn.call::<()>(()) {
+                        error::handle_error(
+                            app,
+                            "Lua Error",
+                            &format!("Error calling app.on_ready: {}", e),
+                        );
+                        return;
+                    }
+                }
             } else {
                 error::handle_error(
                     app,
@@ -331,4 +352,3 @@ fn build_menu_from_lua(menu_table: mlua::Table) -> gio::Menu {
     }
     menu
 }
-

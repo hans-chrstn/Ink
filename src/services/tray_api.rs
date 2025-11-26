@@ -183,8 +183,8 @@ pub(crate) fn get_item_properties_processed(
 
 pub fn register(lua: Rc<Lua>) -> Result<()> {
     let globals = lua.globals();
-    let ink_table: Table = globals.get("ink")?;
-    let tray_table: Table = ink_table.get("tray")?;
+    let app_table: Table = globals.get("app")?;
+    let tray_table: Table = app_table.get("tray")?;
 
     tray_table.set(
         "get_item_properties",

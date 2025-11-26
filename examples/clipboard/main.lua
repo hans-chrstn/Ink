@@ -1,7 +1,6 @@
 return {
 	type = "GtkApplicationWindow",
 	properties = {
-		title = "Native Clipboard Example",
 		default_width = 400,
 		default_height = 300,
 		visible = true,

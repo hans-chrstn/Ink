@@ -6,7 +6,7 @@ local ignore_update = false
 local is_hovered = false
 local function try_hide()
 	if is_hovered then
-		hide_timer = setTimeout(500, try_hide)
+		hide_timer = set_timeout(500, try_hide)
 		return
 	end
 	if revealer then
@@ -21,7 +21,7 @@ local function show_osd()
 	if hide_timer then
 		clearTimeout(hide_timer)
 	end
-	hide_timer = setTimeout(2000, try_hide)
+	hide_timer = set_timeout(2000, try_hide)
 end
 local function sync_volume()
 	local vol = Audio.get_volume()

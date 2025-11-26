@@ -1,11 +1,14 @@
 local cfg = require("config")
-local apps = Apps.list()
-
-table.sort(apps, function(a, b)
-	return a.name:lower() < b.name:lower()
-end)
+local apps = {}
 
 local app_grid_widget = nil
+
+local function on_ink_ready()
+	apps = Apps.list()
+	table.sort(apps, function(a, b)
+		return a.name:lower() < b.name:lower()
+	end)
+end
 
 local function create_app_button(app)
 	return {
@@ -54,27 +57,38 @@ local function filter_apps(text)
 	end
 end
 
+local function on_ink_ready()
+	apps = Apps.list()
+	table.sort(apps, function(a, b)
+		return a.name:lower() < b.name:lower()
+	end)
+
+	app_grid_widget = app.get_widget_by_id("app_grid")
+	filter_apps("")
+end
+app.on_ready = on_ink_ready
+
 return {
 	type = "GtkApplicationWindow",
 	window_mode = "layer_shell",
 	layer = "overlay",
 	anchors = { top = true, bottom = true, left = true, right = true },
 	keyboard_mode = "exclusive",
-
+	properties = {
+		visible = true,
+	},
 	keymaps = {
 		["Escape"] = function()
 			exit()
 		end,
 	},
-
 	css = [[
-        window { background-color: rgba(0, 0, 0, 0.85); }
-        button { padding: 12px; border-radius: 12px; }
-        button:hover { background-color: rgba(255, 255, 255, 0.15); }
-        label { color: white; font-weight: bold; }
-        entry { background: rgba(255,255,255,0.1); color: white; border-radius: 8px; padding: 10px; }
-    ]],
-
+    window { background-color: rgba(0, 0, 0, 0.85); }
+    button { padding: 12px; border-radius: 12px; }
+    button:hover { background-color: rgba(255, 255, 255, 0.15); }
+    label { color: white; font-weight: bold; }
+    entry { background: rgba(255,255,255,0.1); color: white; border-radius: 8px; padding: 10px; }
+  ]],
 	children = {
 		{
 			type = "GtkBox",
@@ -105,6 +119,7 @@ return {
 					children = {
 						{
 							type = "GtkFlowBox",
+							id = "app_grid",
 							properties = {
 								valign = "start",
 								homogeneous = true,
@@ -113,12 +128,6 @@ return {
 								row_spacing = 20,
 								column_spacing = 20,
 								selection_mode = "none",
-							},
-							signals = {
-								map = function(self)
-									app_grid_widget = self
-									filter_apps("")
-								end,
 							},
 						},
 					},

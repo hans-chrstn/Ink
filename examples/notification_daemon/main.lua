@@ -1,11 +1,6 @@
 local active_notifications = {}
 
-function ink.on_notification(params)
-	print("Received notification in Lua:")
-	print("  App: " .. params.app_name)
-	print("  Summary: " .. params.summary)
-	print("  Body: " .. params.body)
-
+function app.on_notification(params)
 	local notif_ui = {
 		type = "GtkWindow",
 		window_mode = "layer_shell",
@@ -57,7 +52,6 @@ function ink.on_notification(params)
 
 	local timeout_ms = (params.timeout > 0 and params.timeout) or 5000
 	set_timeout(timeout_ms, function()
-		print("Closing notification " .. id)
 		if active_notifications[id] then
 			active_notifications[id]:destroy()
 			active_notifications[id] = nil

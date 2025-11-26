@@ -3,15 +3,17 @@ use crate::scripting::traits::ScriptValue;
 use crate::ui::registry::Registry;
 use crate::ui::traits::WidgetBehavior;
 use gtk4::Widget;
-use gtk4::glib::{Object, GString};
+use gtk4::glib::{GString, Object};
 use gtk4::prelude::*;
+use mlua::{Lua, Table};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
-use mlua::Lua;
 use std::rc::Rc;
-use std::cell::RefCell;
 
+use crate::scripting::globals::get_core_context;
 use crate::scripting::lua_driver::LuaWrapper;
+use crate::scripting::widget_wrapper::LuaWidget as WidgetWrapper;
 
 pub struct UiBuilder {
     behaviors: HashMap<String, Box<dyn WidgetBehavior<LuaWrapper>>>,
@@ -46,6 +48,25 @@ impl UiBuilder {
         self.widgets_by_id.borrow().get(id).cloned()
     }
 
+    pub fn register_get_widget_by_id_lua_function(
+        lua: &Rc<Lua>,
+        app_global: &Table,
+    ) -> mlua::Result<()> {
+        app_global.set(
+            "get_widget_by_id",
+            lua.create_function(|lua, id: String| {
+                let core_context = get_core_context(lua)?;
+                let core_context_guard = core_context.borrow();
+                let ui_builder_guard = core_context_guard.ui_builder.borrow();
+                let widget = ui_builder_guard
+                    .get_widget_by_id(&id)
+                    .ok_or_else(|| mlua::Error::runtime(format!("Widget not found: {}", id)))?;
+                Ok(WidgetWrapper(widget))
+            })?,
+        )?;
+        Ok(())
+    }
+
     fn build_recursive(&self, data: &LuaWrapper, config_dir: &Path) -> Result<Widget, String> {
         let type_name = data
             .get_property("type")
@@ -62,18 +83,27 @@ impl UiBuilder {
 
         if let Some(id_val) = data.get_property("id") {
             if let Some(id_str) = id_val.as_string() {
-                self.widgets_by_id.borrow_mut().insert(id_str, widget.clone());
+                self.widgets_by_id
+                    .borrow_mut()
+                    .insert(id_str, widget.clone());
             }
         }
-
 
         if let Some(props) = data
             .get_property("properties")
             .and_then(|v| v.get_map_entries())
         {
+            const CONTAINER_PROPERTIES: &[&str] =
+                &["grid_col", "grid_row", "grid_width", "grid_height"];
+
             for (k, v) in props {
+                if CONTAINER_PROPERTIES.contains(&k.as_str()) {
+                    continue;
+                }
+
                 if let Some(pspec) = widget.find_property(&k) {
-                    let is_path_prop = (k == "file" || k == "icon-name" || k == "file-name") && pspec.value_type() == GString::static_type();
+                    let is_path_prop = (k == "file" || k == "icon-name" || k == "file-name")
+                        && pspec.value_type() == GString::static_type();
                     if is_path_prop {
                         if let Some(path_str) = v.as_string() {
                             let path = Path::new(&path_str);
@@ -83,17 +113,28 @@ impl UiBuilder {
                                 config_dir.join(path)
                             };
 
-                            let lua_string = self.lua.create_string(&*final_path.to_string_lossy())
+                            let lua_string = self
+                                .lua
+                                .create_string(&*final_path.to_string_lossy())
                                 .map_err(|e| format!("Failed to create Lua string: {}", e))?;
                             let resolved_path_wrapper = LuaWrapper(mlua::Value::String(lua_string));
 
-                            if let Some(gval) = GenericConverter::to_gvalue(&resolved_path_wrapper, pspec.value_type()) {
+                            if let Some(gval) = GenericConverter::to_gvalue(
+                                &resolved_path_wrapper,
+                                pspec.value_type(),
+                            ) {
                                 widget.set_property(&k, gval);
                             } else {
-                                return Err(format!("Failed to convert resolved path for property '{}' on type '{}'", k, type_name));
+                                return Err(format!(
+                                    "Failed to convert resolved path for property '{}' on type '{}'",
+                                    k, type_name
+                                ));
                             }
                         } else {
-                            return Err(format!("Property '{}' on type '{}' expects a string, but got non-string value", k, type_name));
+                            return Err(format!(
+                                "Property '{}' on type '{}' expects a string, but got non-string value",
+                                k, type_name
+                            ));
                         }
                     } else {
                         if let Some(gval) = GenericConverter::to_gvalue(&v, pspec.value_type()) {
@@ -101,7 +142,10 @@ impl UiBuilder {
                         }
                     }
                 } else {
-                    return Err(format!("Property '{}' not found on type '{}'", k, type_name));
+                    return Err(format!(
+                        "Property '{}' not found on type '{}'",
+                        k, type_name
+                    ));
                 }
             }
         }

@@ -35,7 +35,6 @@ return {
 	},
 	auto_exclusive_zone = true,
 	properties = {
-		title = "My Ink Bar",
 		default_height = 40,
 		css_classes = { "my-window" },
 		visible = true,

@@ -8,10 +8,66 @@ use gtk4::gdk;
 use gtk4::glib;
 use gtk4::glib::prelude::*;
 use gtk4::prelude::*;
-use mlua::{Function, Lua, Result, Value};
+use mlua::{Function, Lua, RegistryKey, Result, Value};
+use once_cell::sync::OnceCell;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Arc;
+
+use crate::core::context::AppContext;
+
+#[derive(Clone)]
+pub struct CoreContext {
+    #[allow(dead_code)]
+    pub app_context: Arc<AppContext>,
+    pub ui_builder: Rc<RefCell<UiBuilder>>,
+}
+
+#[derive(Clone)]
+pub struct LuaCoreContext(pub Rc<RefCell<CoreContext>>);
+
+impl mlua::UserData for LuaCoreContext {}
+
+impl mlua::FromLua for LuaCoreContext {
+    fn from_lua(value: mlua::Value, _lua: &mlua::Lua) -> mlua::Result<Self> {
+        match value {
+            mlua::Value::UserData(ud) => ud.borrow::<Self>().map(|rc| rc.clone()),
+            _ => Err(mlua::Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "LuaCoreContext".to_string(),
+                message: Some("Expected UserData containing LuaCoreContext".to_string()),
+            }),
+        }
+    }
+}
+
+static CORE_CONTEXT_REGISTRY_KEY: OnceCell<RegistryKey> = OnceCell::new();
+
+pub fn get_core_context(lua: &Lua) -> mlua::Result<Rc<RefCell<CoreContext>>> {
+    let key = CORE_CONTEXT_REGISTRY_KEY
+        .get()
+        .expect("CORE_CONTEXT_REGISTRY_KEY not initialized");
+    let lua_core_context: LuaCoreContext = lua.registry_value(key)?;
+    Ok(lua_core_context.0)
+}
+
+pub fn set_core_context(
+    lua: &Rc<Lua>,
+    app_context: Arc<AppContext>,
+    ui_builder: Rc<RefCell<UiBuilder>>,
+) -> mlua::Result<()> {
+    let core_context = Rc::new(RefCell::new(CoreContext {
+        app_context,
+        ui_builder,
+    }));
+    let lua_core_context = LuaCoreContext(core_context);
+    let key = lua.create_registry_value(lua_core_context)?;
+    CORE_CONTEXT_REGISTRY_KEY
+        .set(key)
+        .expect("CORE_CONTEXT_REGISTRY_KEY already initialized");
+    Ok(())
+}
 
 fn init_gtk_bindings(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
     let gtk_table = lua.create_table()?;
@@ -20,31 +76,10 @@ fn init_gtk_bindings(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
     Ok(())
 }
 
-fn init_ink_core_functions(
-    lua: &Rc<Lua>,
-    ink_table: &mlua::Table,
-    ui_builder: Rc<RefCell<UiBuilder>>,
-) -> Result<()> {
-    ink_table.set(
-        "get_widget_by_id",
-        lua.create_function({
-            let ui_builder = ui_builder.clone();
-            move |lua, id: String| {
-                if let Some(widget) = ui_builder.borrow().get_widget_by_id(&id) {
-                    Ok(mlua::Value::UserData(
-                        lua.create_userdata(LuaWidget(widget))?,
-                    ))
-                } else {
-                    Ok(mlua::Value::Nil)
-                }
-            }
-        })?,
-    )?;
-
+fn init_app_core_functions(lua: &Rc<Lua>, app_table: &mlua::Table) -> Result<()> {
     let tray_table = lua.create_table()?;
-    ink_table.set("tray", tray_table)?;
-
-    ink_table.set(
+    app_table.set("tray", tray_table)?;
+    app_table.set(
         "markdown_to_pango",
         lua.create_function(|_, markdown: String| Ok(stdlib::markdown_to_pango(&markdown)))?,
     )?;
@@ -53,6 +88,8 @@ fn init_ink_core_functions(
 
 fn init_clipboard_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
     let clipboard_table = lua.create_table()?;
+    globals.set("Clipboard", clipboard_table.clone())?;
+
     clipboard_table.set(
         "set_text",
         lua.create_function(|_, text: String| {
@@ -88,7 +125,6 @@ fn init_clipboard_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> 
             }
         })?,
     )?;
-    globals.set("Clipboard", clipboard_table)?;
     Ok(())
 }
 
@@ -321,22 +357,24 @@ fn init_utility_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
 pub fn init(
     lua: Rc<Lua>,
     app: Application,
-    config_dir: PathBuf,
+    app_context: Arc<AppContext>,
     ui_builder: Rc<RefCell<UiBuilder>>,
 ) -> Result<()> {
     let globals = lua.globals();
 
-    let ink_table = lua.create_table()?;
-    globals.set("ink", ink_table.clone())?;
+    let app_table = lua.create_table()?;
+    globals.set("app", app_table.clone())?;
+
+    set_core_context(&lua, app_context.clone(), ui_builder.clone())?;
 
     init_gtk_bindings(&lua, &globals)?;
-    init_ink_core_functions(&lua, &ink_table, ui_builder.clone())?;
+    init_app_core_functions(&lua, &app_table)?;
     init_clipboard_functions(&lua, &globals)?;
     init_ui_builder_function(
         &lua,
         &globals,
         app.clone(),
-        config_dir.clone(),
+        app_context.main_file_path.clone(),
         ui_builder.clone(),
     )?;
     init_notification_function(&lua, &globals)?;

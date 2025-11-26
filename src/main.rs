@@ -14,6 +14,7 @@ use std::cell::RefCell;
 use std::env;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
@@ -46,11 +47,12 @@ async fn main() {
         let lua = Rc::new(mlua::Lua::new());
         let ui_builder = Rc::new(RefCell::new(UiBuilder::new(lua.clone())));
         let context = AppContext::new(file.clone());
+        let app_instance_context = Arc::new(context);
 
         scripting::globals::init(
             lua.clone(),
             app.clone(),
-            file.parent().unwrap_or(&PathBuf::from(".")).to_path_buf(),
+            app_instance_context.clone(),
             ui_builder.clone(),
         )
         .expect("Failed to initialize globals");
@@ -58,7 +60,7 @@ async fn main() {
         let mut app_instance = App::new(
             app.clone(),
             lua.clone(),
-            context,
+            Arc::try_unwrap(app_instance_context).unwrap_or_else(|arc| (*arc).clone()),
             config.windowed,
             ui_builder.clone(),
         );

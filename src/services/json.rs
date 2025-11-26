@@ -17,6 +17,6 @@ pub fn register(lua: &Lua) -> Result<()> {
             Ok(lua.to_value(&v))
         })?,
     )?;
-    lua.globals().get::<Table>("ink")?.set("json", json_table)?;
+    lua.globals().get::<Table>("app")?.set("json", json_table)?;
     Ok(())
 }

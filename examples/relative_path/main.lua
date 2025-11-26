@@ -1,6 +1,5 @@
 local lib = require("lib")
 return {
-	title = "Relative Path Test",
 	properties = {
 		visible = true,
 		default_width = 400,

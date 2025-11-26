@@ -1,7 +1,6 @@
 return {
 	type = "GtkApplicationWindow",
 	properties = {
-		title = "Actions and Menus Example",
 		default_width = 400,
 		default_height = 300,
 		visible = true,
@@ -11,7 +10,6 @@ return {
 		{
 			name = "quit",
 			callback = function()
-				print("Quit action triggered!")
 				exit()
 			end,
 		},

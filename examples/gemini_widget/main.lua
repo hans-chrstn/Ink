@@ -12,7 +12,7 @@ end
 
 local function scroll_to_bottom()
 	set_timeout(100, function()
-		local scrolled_window = ink.get_widget_by_id("scrolled_window")
+		local scrolled_window = app.get_widget_by_id("scrolled_window")
 		if not scrolled_window then
 			return
 		end
@@ -24,7 +24,7 @@ local function scroll_to_bottom()
 end
 
 local function add_message(text, sender, id)
-	local message_box = ink.get_widget_by_id("message_box")
+	local message_box = app.get_widget_by_id("message_box")
 	if not message_box then
 		return nil
 	end
@@ -32,7 +32,7 @@ local function add_message(text, sender, id)
 	local widget_definition = {
 		type = "GtkLabel",
 		properties = {
-			label = ink.markdown_to_pango(text),
+			label = app.markdown_to_pango(text),
 			use_markup = true,
 			wrap = true,
 			css_classes = { "message", sender .. "-message" },
@@ -60,7 +60,7 @@ local function update_thinking_indicator()
 		return false
 	end
 
-	local indicator = ink.get_widget_by_id("thinking_indicator")
+	local indicator = app.get_widget_by_id("thinking_indicator")
 	if not indicator then
 		return false
 	end
@@ -79,8 +79,8 @@ local function update_thinking_indicator()
 end
 
 local function send_message()
-	local entry_input = ink.get_widget_by_id("entry_input")
-	local send_button = ink.get_widget_by_id("send_button")
+	local entry_input = app.get_widget_by_id("entry_input")
+	local send_button = app.get_widget_by_id("send_button")
 	if not entry_input or not send_button then
 		return
 	end
@@ -115,7 +115,7 @@ local function send_message()
 		["Content-Type"] = "application/json",
 		["X-goog-api-key"] = api_key,
 	}
-	local body = ink.json.stringify({
+	local body = app.json.stringify({
 		contents = {
 			{
 				parts = {
@@ -134,7 +134,7 @@ local function send_message()
 		if response.err then
 			response_text_to_add = "Error: " .. response.err
 		else
-			local data = ink.json.parse(response.ok)
+			local data = app.json.parse(response.ok)
 
 			if data and data.candidates and #data.candidates > 0 then
 				response_text_to_add = data.candidates[1].content.parts[1].text

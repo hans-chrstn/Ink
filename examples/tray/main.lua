@@ -1,9 +1,9 @@
 local tray_items = {}
 local tray_container = nil
 
-function ink.tray.on_item_added(service)
+function app.tray.on_item_added(service)
 	set_timeout(100, function()
-		local props = ink.tray.get_item_properties(service)
+		local props = app.tray.get_item_properties(service)
 		if not props then
 			return
 		end
@@ -51,7 +51,7 @@ function ink.tray.on_item_added(service)
 	end)
 end
 
-function ink.tray.on_item_removed(service)
+function app.tray.on_item_removed(service)
 	if tray_items[service] then
 		tray_items[service]:destroy()
 		tray_items[service] = nil
@@ -60,11 +60,11 @@ end
 
 return {
 	{
-		title = "Tray Bar",
 		window_mode = "layer_shell",
 		layer = "top",
 		anchors = { top = true, right = true },
 		properties = {
+			title = "Tray Bar",
 			visible = true,
 			default_height = 40,
 		},
