@@ -45,6 +45,13 @@ pub fn init(
     let tray_table = lua.create_table()?;
     ink_table.set("tray", tray_table)?;
 
+    ink_table.set(
+        "markdown_to_pango",
+        lua.create_function(|_, markdown: String| {
+            Ok(stdlib::markdown_to_pango(&markdown))
+        })?,
+    )?;
+
     let clipboard_table = lua.create_table()?;
     clipboard_table.set(
         "set_text",
