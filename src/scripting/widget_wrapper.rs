@@ -1,3 +1,4 @@
+use crate::interop::signals::SignalConnector;
 use crate::scripting::lua_driver::LuaWrapper;
 use crate::ui::registry::Registry;
 use gtk4::glib::Type as GType;
@@ -240,5 +241,64 @@ impl UserData for LuaWidget {
             }
             Ok(())
         });
+
+        methods.add_method("get_property", |lua, this, key: String| {
+            let pspec_opt = this.0.find_property(&key);
+
+            if pspec_opt.is_none() {
+                return Ok(Value::Nil);
+            }
+
+            let prop_value = this.0.property_value(&key);
+
+            let lua_value = if prop_value.type_().is_a(String::static_type()) {
+                prop_value
+                    .get::<String>()
+                    .map(|s| Value::String(lua.create_string(&s).unwrap()))
+                    .unwrap_or(Value::Nil)
+            } else if prop_value.type_().is_a(bool::static_type()) {
+                prop_value
+                    .get::<bool>()
+                    .map(Value::Boolean)
+                    .unwrap_or(Value::Nil)
+            } else if prop_value.type_().is_a(f64::static_type()) {
+                prop_value
+                    .get::<f64>()
+                    .map(Value::Number)
+                    .unwrap_or(Value::Nil)
+            } else if prop_value.type_().is_a(i32::static_type()) {
+                prop_value
+                    .get::<i32>()
+                    .map(|i| Value::Integer(i as i64))
+                    .unwrap_or(Value::Nil)
+            } else if prop_value.type_().is_a(u32::static_type()) {
+                prop_value
+                    .get::<u32>()
+                    .map(|u| Value::Integer(u as i64))
+                    .unwrap_or(Value::Nil)
+            } else if prop_value.type_().is_a(gtk4::Adjustment::static_type()) {
+                prop_value
+                    .get::<gtk4::Adjustment>()
+                    .map(|adj| Value::UserData(lua.create_userdata(LuaAdjustment(adj)).unwrap()))
+                    .unwrap_or(Value::Nil)
+            } else {
+                Value::Nil
+            };
+            Ok(lua_value)
+        });
+
+        methods.add_method(
+            "connect_signal",
+            |_, this, (signal_name, func): (String, Function)| {
+                let lua_value_func: Value = Value::Function(func);
+                let lua_wrapper_func = LuaWrapper(lua_value_func);
+                SignalConnector::connect(
+                    this.0.upcast_ref::<glib::Object>(),
+                    &signal_name,
+                    lua_wrapper_func,
+                );
+                Ok(())
+            },
+        );
     }
 }

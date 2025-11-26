@@ -153,9 +153,9 @@ end
 
 return {
 	type = "GtkApplicationWindow",
-	title = "Gemini AI",
 	id = "main_window",
 	properties = {
+		title = "Gemini AI",
 		default_width = 400,
 		default_height = 600,
 		visible = true,
@@ -231,8 +231,8 @@ return {
 			children = {
 				{
 					type = "GtkBox",
-					css_classes = { "top-bar" },
 					properties = {
+						css_classes = { "top-bar" },
 						orientation = "horizontal",
 						spacing = 10,
 						margin_top = 5,
@@ -243,8 +243,8 @@ return {
 					children = {
 						{
 							type = "GtkDrawingArea",
-							css_classes = { "profile-pic" },
 							properties = {
+								css_classes = { "profile-pic" },
 								width_request = 32,
 								height_request = 32,
 							},
@@ -268,8 +268,8 @@ return {
 							properties = {
 								width_request = 24,
 								height_request = 24,
+								css_classes = { "exit-button" },
 							},
-							css_classes = { "exit-button" },
 							signals = {
 								clicked = function()
 									exit()
@@ -303,8 +303,8 @@ return {
 				},
 				{
 					type = "GtkBox",
-					css_classes = { "bottom-bar" },
 					properties = {
+						css_classes = { "bottom-bar" },
 						orientation = "horizontal",
 						spacing = 10,
 						margin_top = 5,
@@ -319,8 +319,8 @@ return {
 							properties = {
 								placeholder_text = "Enter a prompt...",
 								hexpand = true,
+								css_classes = { "entry" },
 							},
-							css_classes = { "entry" },
 							signals = {
 								activate = send_message,
 							},
@@ -331,8 +331,8 @@ return {
 							properties = {
 								label = "Send",
 								valign = "center",
+								css_classes = { "beautiful-button" },
 							},
-							css_classes = { "beautiful-button" },
 							signals = {
 								clicked = send_message,
 							},

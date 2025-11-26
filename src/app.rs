@@ -13,6 +13,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Duration;
 
 pub struct App {
     app: Application,
@@ -114,12 +115,42 @@ impl App {
 
                 Self::build_ui_windows(app, lua, &config_dir, windowed, ui_builder, &table)?;
 
-                if let Ok(on_ready_fn) = lua.globals().get::<mlua::Function>("on_ready")
-                    && let Err(e) = on_ready_fn.call::<()>(())
-                {
-                    let app_err = AppError::LuaError(e);
-                    error::handle_error(app, "Lua Error", &app_err);
-                    return Err(app_err);
+
+                match lua.globals().get::<mlua::Table>("app") {
+                    Ok(app_global_table) => {
+
+                        match app_global_table.get::<mlua::Function>("on_ready") {
+                            Ok(on_ready_fn) => {
+
+                                let on_ready_fn_clone = lua
+                                    .create_registry_value(on_ready_fn)
+                                    .map_err(AppError::LuaError)?;
+                                let lua_clone = lua.clone();
+                                glib::timeout_add_local_once(
+                                    Duration::from_millis(10),
+                                    move || {
+                                        if let Ok(func) = lua_clone
+                                            .registry_value::<mlua::Function>(&on_ready_fn_clone)
+                                        {
+                                            if let Err(_e) = func.call::<()>(()) {
+
+                                            } else {
+
+                                            }
+                                        } else {
+
+                                        }
+                                    },
+                                );
+                            }
+                            Err(_e) => {
+
+                            }
+                        }
+                    }
+                    Err(_e) => {
+
+                    }
                 }
                 Ok(())
             }
@@ -276,9 +307,20 @@ impl App {
                     if let Some(w) = root.downcast_ref::<gtk4::Window>() {
                         w.set_application(Some(app));
 
-                        if let Some(title_prop) = wrapped.get_property("title")
+                        let title_str_opt = if let Some(title_prop) = wrapped.get_property("title")
                             && let Some(title_str) = title_prop.as_string()
                         {
+                            Some(title_str)
+                        } else if let Some(props_wrapper) = wrapped.get_property("properties")
+                            && let Some(title_prop_from_props) = props_wrapper.get_property("title")
+                            && let Some(title_str_from_props) = title_prop_from_props.as_string()
+                        {
+                            Some(title_str_from_props)
+                        } else {
+                            None
+                        };
+
+                        if let Some(title_str) = title_str_opt {
                             windows_table
                                 .set(
                                     title_str,

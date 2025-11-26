@@ -21,12 +21,12 @@ end
 
 return {
 	{
-		title = "Bar",
-		default_height = 40,
 		window_mode = "layer_shell",
 		layer = "top",
 		anchors = { top = true, left = true, right = true, bottom = false },
 		properties = {
+			title = "Bar",
+			default_height = 40,
 			visible = true,
 		},
 		children = {
@@ -54,12 +54,12 @@ return {
 		},
 	},
 	{
-		title = "Launcher",
-		default_width = 400,
-		default_height = 300,
 		window_mode = "layer_shell",
 		layer = "overlay",
 		properties = {
+			title = "Launcher",
+			default_width = 400,
+			default_height = 300,
 			visible = false,
 		},
 		children = {

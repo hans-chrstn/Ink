@@ -15,6 +15,28 @@ use crate::scripting::globals::get_core_context;
 use crate::scripting::lua_driver::LuaWrapper;
 use crate::scripting::widget_wrapper::LuaWidget as WidgetWrapper;
 
+const ALLOWED_TOP_LEVEL_KEYS: &[&str] = &[
+    "id",
+    "type",
+    "properties",
+    "signals",
+    "children",
+
+    "window_mode",
+    "layer",
+    "anchors",
+    "margins",
+    "auto_exclusive_zone",
+    "keyboard_mode",
+    "css",
+    "css_path",
+    "realize",
+    "actions",
+    "menu",
+    "draw",
+    "keymaps",
+];
+
 pub struct UiBuilder {
     behaviors: HashMap<String, Box<dyn WidgetBehavior<LuaWrapper>>>,
     lua: Rc<Lua>,
@@ -45,7 +67,10 @@ impl UiBuilder {
     }
 
     pub fn get_widget_by_id(&self, id: &str) -> Option<Widget> {
-        self.widgets_by_id.borrow().get(id).cloned()
+
+        let widget = self.widgets_by_id.borrow().get(id).cloned();
+
+        widget
     }
 
     pub fn register_get_widget_by_id_lua_function(
@@ -80,6 +105,18 @@ impl UiBuilder {
 
         self.apply_widget_behavior(&widget, &type_name, data);
 
+        if let Some(entries) = data.get_map_entries() {
+            for (key, _) in entries {
+                if !ALLOWED_TOP_LEVEL_KEYS.contains(&key.as_str()) {
+                    return Err(format!(
+                        "Unknown top-level configuration property: '{}' for widget type '{}'. \
+                        Did you mean to put it inside 'properties = {{}}'?",
+                        key, type_name
+                    ));
+                }
+            }
+        }
+
         Ok(widget)
     }
 
@@ -102,11 +139,12 @@ impl UiBuilder {
 
     fn register_widget_id(&self, data: &LuaWrapper, widget: &Widget) {
         if let Some(id_val) = data.get_property("id")
-            && let Some(id_str) = id_val.as_string() {
-                self.widgets_by_id
-                    .borrow_mut()
-                    .insert(id_str, widget.clone());
-            };
+            && let Some(id_str) = id_val.as_string()
+        {
+            self.widgets_by_id
+                .borrow_mut()
+                .insert(id_str, widget.clone());
+        };
     }
 
     fn set_widget_properties(
@@ -124,11 +162,13 @@ impl UiBuilder {
                 &["grid_col", "grid_row", "grid_width", "grid_height"];
 
             for (k, v) in props {
+                let gtk_property_name = k.replace("_", "-");
+
                 if CONTAINER_PROPERTIES.contains(&k.as_str()) {
                     continue;
                 }
 
-                if let Some(pspec) = widget.find_property(&k) {
+                if let Some(pspec) = widget.find_property(&gtk_property_name) {
                     let is_path_prop = (k == "file" || k == "icon-name" || k == "file-name")
                         && pspec.value_type() == GString::static_type();
                     if is_path_prop {
@@ -151,7 +191,7 @@ impl UiBuilder {
                                 pspec.value_type(),
                             )
                             .map_err(|e| format!("Failed to convert path property: {}", e))?;
-                            widget.set_property(&k, gval);
+                            widget.set_property(&gtk_property_name, gval);
                         } else {
                             return Err(format!(
                                 "Property '{}' on type '{}' expects a string, but got non-string value",
@@ -161,7 +201,7 @@ impl UiBuilder {
                     } else {
                         let gval = GenericConverter::to_gvalue(&v, pspec.value_type())
                             .map_err(|e| format!("Failed to convert property: {}", e))?;
-                        widget.set_property(&k, gval);
+                        widget.set_property(&gtk_property_name, gval);
                     }
                 } else {
                     return Err(format!(
@@ -213,3 +253,4 @@ impl UiBuilder {
         }
     }
 }
+

@@ -32,15 +32,16 @@ pub fn register(lua: &Lua) -> Result<()> {
         "list",
         lua.create_function(|lua, ()| {
             let all_apps = AppInfo::all();
+
             let result = lua.create_table()?;
             let mut count = 1;
             for app in all_apps.iter() {
-                if !app.should_show() {
-                    continue;
-                }
+
+
                 result.set(count, LuaApp(app.clone()))?;
                 count += 1;
             }
+
             Ok(result)
         })?,
     )?;

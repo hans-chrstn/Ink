@@ -61,10 +61,10 @@ end
 return {
 	{
 		window_mode = "layer_shell",
-		title = "Tray Bar",
 		layer = "top",
 		anchors = { top = true, right = true },
 		properties = {
+			title = "Tray Bar",
 			visible = true,
 			default_height = 40,
 		},

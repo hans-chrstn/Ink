@@ -1,11 +1,11 @@
 return {
 	{
 		anchors = { top = true, left = true, right = true },
-		title = "First Window",
 		auto_exclusive_zone = true,
 		window_mode = "layer_shell",
 		layer = "top",
 		properties = {
+			title = "First Window",
 			visible = true,
 			default_width = 300,
 			default_height = 200,

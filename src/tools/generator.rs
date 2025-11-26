@@ -1,19 +1,20 @@
 use crate::ui::registry::Registry;
 use gtk4::glib::object::ObjectClass;
 use gtk4::prelude::*;
+use include_dir::{Dir, include_dir};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use tera::{Context, Tera};
+
+static TEMPLATES_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/tools/templates");
+
 pub fn generate(target_dir: Option<PathBuf>) -> std::io::Result<()> {
     let dir = match target_dir {
         Some(d) => d,
         None => {
-            let home = std::env::var("HOME").map_err(|e| {
-                io::Error::other(
-                    format!("Could not find HOME directory: {}", e),
-                )
-            })?;
+            let home = std::env::var("HOME")
+                .map_err(|e| io::Error::other(format!("Could not find HOME directory: {}", e)))?;
             PathBuf::from(home).join(".config").join("ink")
         }
     };
@@ -27,11 +28,20 @@ pub fn generate(target_dir: Option<PathBuf>) -> std::io::Result<()> {
     Ok(())
 }
 fn generate_definitions(path: &Path) -> std::io::Result<()> {
-            let mut tera = Tera::new("src/tools/templates/**/*").map_err(|e| {
-                io::Error::other(
-                    format!("Failed to create Tera instance: {}", e),
-                )
-            })?;    tera.autoescape_on(vec![]);
+    let mut tera = Tera::default();
+    for file in TEMPLATES_DIR.files() {
+        if let Some(content) = file.contents_utf8() {
+            let template_name = file.path().file_name().unwrap().to_str().unwrap();
+            tera.add_raw_template(template_name, content).map_err(|e| {
+                io::Error::other(format!(
+                    "Failed to add template '{}': {}",
+                    file.path().display(),
+                    e
+                ))
+            })?;
+        }
+    }
+    tera.autoescape_on(vec![]);
 
     let mut context = Context::new();
     let mut widgets_data = Vec::new();
@@ -57,11 +67,9 @@ fn generate_definitions(path: &Path) -> std::io::Result<()> {
 
     context.insert("widgets", &widgets_data);
 
-    let rendered = tera.render("definitions.lua.tera", &context).map_err(|e| {
-        io::Error::other(
-            format!("Failed to render definitions.lua.tera: {}", e),
-        )
-    })?;
+    let rendered = tera
+        .render("definitions.lua.tera", &context)
+        .map_err(|e| io::Error::other(format!("Failed to render definitions.lua.tera: {}", e)))?;
     fs::write(path, rendered)?;
     Ok(())
 }
@@ -88,17 +96,24 @@ fn generate_main(path: &Path) -> std::io::Result<()> {
     if path.exists() {
         return Ok(());
     }
-    let tera = Tera::new("src/tools/templates/**/*").map_err(|e| {
-        io::Error::other(
-            format!("Failed to create Tera instance: {}", e),
-        )
-    })?;
+    let mut tera = Tera::default();
+    for file in TEMPLATES_DIR.files() {
+        if let Some(content) = file.contents_utf8() {
+            let template_name = file.path().file_name().unwrap().to_str().unwrap();
+            tera.add_raw_template(template_name, content).map_err(|e| {
+                io::Error::other(format!(
+                    "Failed to add template '{}': {}",
+                    file.path().display(),
+                    e
+                ))
+            })?;
+        }
+    }
+    tera.autoescape_on(vec![]);
     let context = Context::new();
-    let rendered = tera.render("ink.lua.tera", &context).map_err(|e| {
-        io::Error::other(
-            format!("Failed to render ink.lua.tera: {}", e),
-        )
-    })?;
+    let rendered = tera
+        .render("ink.lua.tera", &context)
+        .map_err(|e| io::Error::other(format!("Failed to render ink.lua.tera: {}", e)))?;
     fs::write(path, rendered)?;
     Ok(())
 }
@@ -106,17 +121,24 @@ fn generate_config(path: &Path) -> std::io::Result<()> {
     if path.exists() {
         return Ok(());
     }
-    let tera = Tera::new("src/tools/templates/**/*").map_err(|e| {
-        io::Error::other(
-            format!("Failed to create Tera instance: {}", e),
-        )
-    })?;
+    let mut tera = Tera::default();
+    for file in TEMPLATES_DIR.files() {
+        if let Some(content) = file.contents_utf8() {
+            let template_name = file.path().file_name().unwrap().to_str().unwrap();
+            tera.add_raw_template(template_name, content).map_err(|e| {
+                io::Error::other(format!(
+                    "Failed to add template '{}': {}",
+                    file.path().display(),
+                    e
+                ))
+            })?;
+        }
+    }
+    tera.autoescape_on(vec![]);
     let context = Context::new();
-    let rendered = tera.render("config.lua.tera", &context).map_err(|e| {
-        io::Error::other(
-            format!("Failed to render config.lua.tera: {}", e),
-        )
-    })?;
+    let rendered = tera
+        .render("config.lua.tera", &context)
+        .map_err(|e| io::Error::other(format!("Failed to render config.lua.tera: {}", e)))?;
     fs::write(path, rendered)?;
     Ok(())
 }

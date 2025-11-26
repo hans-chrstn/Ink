@@ -1,14 +1,6 @@
 local cfg = require("config")
 local apps = {}
-
 local app_grid_widget = nil
-
-local function on_ink_ready()
-	apps = Apps.list()
-	table.sort(apps, function(a, b)
-		return a.name:lower() < b.name:lower()
-	end)
-end
 
 local function create_app_button(app)
 	return {
@@ -42,31 +34,51 @@ local function create_app_button(app)
 end
 
 local function filter_apps(text)
+	print("DEBUG (Lua): filter_apps called with text: '" .. text .. "'")
 	if not app_grid_widget then
+		print("DEBUG (Lua): filter_apps called but app_grid_widget is nil. Cannot filter.")
 		return
 	end
 
 	app_grid_widget:remove_children()
 
 	local query = text:lower()
-	for _, app in ipairs(apps) do
-		if app.name:lower():find(query, 1, true) then
-			local btn = build_ui(create_app_button(app))
-			app_grid_widget:add(btn)
+	local added_count = 0
+	for _, app_item in ipairs(apps) do
+		if app_item.name:lower():find(query, 1, true) then
+			local btn = build_ui(create_app_button(app_item))
+			if btn then
+				app_grid_widget:add(btn)
+				added_count = added_count + 1
+			else
+				print("DEBUG (Lua): Failed to build UI for app: " .. app_item.name)
+			end
 		end
 	end
+	print("DEBUG (Lua): Filtered and added " .. added_count .. " buttons for query '" .. text .. "'.")
 end
 
-local function on_ink_ready()
+function app.on_ready()
+	print("DEBUG (Lua): STARTING on_ink_ready function.")
 	apps = Apps.list()
+	print("DEBUG (Lua): Apps.list() returned. Found " .. #apps .. " applications.")
 	table.sort(apps, function(a, b)
 		return a.name:lower() < b.name:lower()
 	end)
 
+	for i = 1, math.min(#apps, 3) do
+		print("DEBUG (Lua): App " .. i .. ": Name = " .. apps[i].name .. ", Icon = " .. apps[i].icon)
+	end
+
 	app_grid_widget = app.get_widget_by_id("app_grid")
-	filter_apps("")
+	if app_grid_widget then
+		print("DEBUG (Lua): app_grid_widget ('app_grid') found via app.get_widget_by_id. Filtering apps...")
+		filter_apps("")
+	else
+		print("DEBUG (Lua): app_grid_widget ('app_grid') NOT found via app.get_widget_by_id! This is a critical error.")
+	end
+	print("DEBUG (Lua): on_ink_ready function finished.")
 end
-app.on_ready = on_ink_ready
 
 return {
 	type = "GtkApplicationWindow",
