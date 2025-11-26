@@ -132,104 +132,136 @@ pub async fn fetch_async(
 
 pub fn markdown_to_pango(markdown: &str) -> String {
     let parser = Parser::new(markdown);
-    let mut pango_output = String::new();
-
-    let mut prev_char_was_whitespace = true;
+    let mut converter = PangoConverter::new();
 
     for event in parser {
-        let prepend_space =
-            !pango_output.is_empty() && !pango_output.ends_with(char::is_whitespace);
+        converter.process_event(event);
+    }
 
-        match event {
-            Event::Start(Tag::Paragraph) => {
-                if !pango_output.is_empty() {
-                    pango_output.push_str("\n\n");
-                }
-                prev_char_was_whitespace = true;
-            }
-            Event::End(TagEnd::Paragraph) => {
-                if !pango_output.ends_with('\n') && !pango_output.is_empty() {
-                    pango_output.push('\n');
-                }
-                prev_char_was_whitespace = true;
-            }
-            Event::Start(Tag::Strong) => {
-                if prepend_space {
-                    pango_output.push(' ');
-                }
-                pango_output.push_str("<b>");
-                prev_char_was_whitespace = false;
-            }
-            Event::End(TagEnd::Strong) => {
-                pango_output.push_str("</b>");
-                prev_char_was_whitespace = false;
-            }
-            Event::Start(Tag::Emphasis) => {
-                if prepend_space {
-                    pango_output.push(' ');
-                }
-                pango_output.push_str("<i>");
-                prev_char_was_whitespace = false;
-            }
-            Event::End(TagEnd::Emphasis) => {
-                pango_output.push_str("</i>");
-                prev_char_was_whitespace = false;
-            }
-            Event::Start(Tag::CodeBlock(_)) => {
-                if prepend_space {
-                    pango_output.push(' ');
-                }
-                pango_output.push_str("<span font_family=\"monospace\">");
-                prev_char_was_whitespace = false;
-            }
-            Event::End(TagEnd::CodeBlock) => {
-                pango_output.push_str("</span>");
-                prev_char_was_whitespace = false;
-            }
-            Event::Start(Tag::Link { dest_url, .. }) => {
-                if prepend_space {
-                    pango_output.push(' ');
-                }
-                pango_output.push_str(&format!("<a href=\"{}\">", pango_escape_text(&dest_url)));
-                prev_char_was_whitespace = false;
-            }
-            Event::End(TagEnd::Link) => {
-                pango_output.push_str("</a>");
-                prev_char_was_whitespace = false;
-            }
-            Event::Text(text) => {
-                if prepend_space
-                    && !text.starts_with(char::is_whitespace)
-                    && !text.starts_with(|c: char| c.is_ascii_punctuation())
-                {
-                    pango_output.push(' ');
-                }
-                pango_output.push_str(&pango_escape_text(&text));
-                prev_char_was_whitespace = pango_output.ends_with(char::is_whitespace);
-            }
-            Event::Code(text) => {
-                if prepend_space {
-                    pango_output.push(' ');
-                }
-                pango_output.push_str(&format!(
-                    "<span font_family=\"monospace\">{}</span>",
-                    pango_escape_text(&text)
-                ));
-                prev_char_was_whitespace = false;
-            }
-            Event::SoftBreak => {
-                pango_output.push_str("\n");
-                prev_char_was_whitespace = true;
-            }
-            Event::HardBreak => {
-                pango_output.push_str("<br/>");
-                prev_char_was_whitespace = true;
-            }
-            _ => {
-                prev_char_was_whitespace = false;
-            }
+    converter.into_string()
+}
+
+struct PangoConverter {
+    output: String,
+    last_output_char_is_whitespace: bool,
+}
+
+impl PangoConverter {
+    fn new() -> Self {
+        PangoConverter {
+            output: String::new(),
+            last_output_char_is_whitespace: true,
         }
     }
 
-    pango_output.trim().to_string()
+    fn push_str_and_update_ws(&mut self, s: &str) {
+        if !s.is_empty() {
+            self.output.push_str(s);
+            self.last_output_char_is_whitespace = s.ends_with(char::is_whitespace);
+        }
+    }
+
+    fn push_char_and_update_ws(&mut self, c: char) {
+        self.output.push(c);
+        self.last_output_char_is_whitespace = c.is_whitespace();
+    }
+
+    fn process_event(&mut self, event: Event) {
+        let prepend_space_conditional =
+            !self.output.is_empty() && !self.last_output_char_is_whitespace;
+
+        match event {
+            Event::Start(Tag::Paragraph) => {
+                if !self.output.is_empty() && !self.output.ends_with("\n\n") {
+                    self.push_str_and_update_ws("\n\n");
+                }
+            }
+            Event::End(TagEnd::Paragraph) => {
+                if !self.output.is_empty() && !self.output.ends_with('\n') {
+                    self.push_char_and_update_ws('\n');
+                }
+            }
+            Event::Start(Tag::List(_)) => {
+                if !self.output.is_empty() && !self.output.ends_with('\n') {
+                    self.push_char_and_update_ws('\n');
+                }
+            }
+            Event::End(TagEnd::List(_)) => {
+                if !self.output.is_empty() && !self.output.ends_with('\n') {
+                    self.push_char_and_update_ws('\n');
+                }
+            }
+            Event::Start(Tag::Item) => {
+                if !self.output.is_empty() && !self.output.ends_with('\n') {
+                    self.push_char_and_update_ws('\n');
+                }
+                self.push_str_and_update_ws("• ");
+            }
+            Event::End(TagEnd::Item) => {}
+            Event::Start(Tag::Strong) => {
+                if prepend_space_conditional {
+                    self.push_char_and_update_ws(' ');
+                }
+                self.push_str_and_update_ws("<b>");
+            }
+            Event::End(TagEnd::Strong) => {
+                self.push_str_and_update_ws("</b>");
+            }
+            Event::Start(Tag::Emphasis) => {
+                if prepend_space_conditional {
+                    self.push_char_and_update_ws(' ');
+                }
+                self.push_str_and_update_ws("<i>");
+            }
+            Event::End(TagEnd::Emphasis) => {
+                self.push_str_and_update_ws("</i>");
+            }
+            Event::Start(Tag::CodeBlock(_)) => {
+                if prepend_space_conditional {
+                    self.push_char_and_update_ws(' ');
+                }
+                self.push_str_and_update_ws("<span font_family=\"monospace\">");
+            }
+            Event::End(TagEnd::CodeBlock) => {
+                self.push_str_and_update_ws("</span>");
+            }
+            Event::Start(Tag::Link { dest_url, .. }) => {
+                if prepend_space_conditional {
+                    self.push_char_and_update_ws(' ');
+                }
+                self.push_str_and_update_ws(&format!(
+                    "<a href=\"{}\">",
+                    pango_escape_text(&dest_url)
+                ));
+            }
+            Event::End(TagEnd::Link) => {
+                self.push_str_and_update_ws("</a>");
+            }
+            Event::Text(text) => {
+                if prepend_space_conditional
+                    && !text.starts_with(char::is_whitespace)
+                    && !text.starts_with(|c: char| c.is_ascii_punctuation())
+                {
+                    self.push_char_and_update_ws(' ');
+                }
+                self.push_str_and_update_ws(&pango_escape_text(&text));
+            }
+            Event::Code(text) => {
+                if prepend_space_conditional {
+                    self.push_char_and_update_ws(' ');
+                }
+                self.push_str_and_update_ws(&format!(
+                    "<span font_family=\"monospace\">{}</span>",
+                    pango_escape_text(&text)
+                ));
+            }
+            Event::SoftBreak => self.push_str_and_update_ws("\n"),
+            Event::HardBreak => self.push_str_and_update_ws("<br/>"),
+            _ => {}
+        }
+    }
+
+    fn into_string(self) -> String {
+        self.output.trim().to_string()
+    }
 }
