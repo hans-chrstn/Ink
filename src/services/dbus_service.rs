@@ -9,6 +9,8 @@ use std::sync::{
 use zbus::zvariant::Value;
 use zbus::{connection, interface};
 
+use crate::core::error::AppError;
+
 #[derive(Debug)]
 pub enum DbusUpdate {
     Notification(Notification),
@@ -38,6 +40,7 @@ impl NotificationServer {
         vec!["body".to_string(), "summary".to_string()]
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn notify(
         &mut self,
         app_name: String,
@@ -55,7 +58,9 @@ impl NotificationServer {
             body,
             timeout: expire_timeout,
         };
-        self.sender.send(DbusUpdate::Notification(notif)).unwrap();
+        if let Err(e) = self.sender.send(DbusUpdate::Notification(notif)) {
+            eprintln!("Failed to send notification DbusUpdate: {}", e);
+        }
         1
     }
 
@@ -86,7 +91,7 @@ impl StatusNotifierWatcher {
                 .send(DbusUpdate::Tray(TrayUpdate::ItemRegistered(
                     service.to_string(),
                 )))
-                .unwrap();
+                .unwrap_or_else(|e| eprintln!("Failed to send tray update: {}", e));
         }
     }
 
@@ -106,7 +111,7 @@ impl StatusNotifierWatcher {
     }
 }
 
-pub fn init(lua: Rc<Lua>) {
+pub fn init(lua: Rc<Lua>) -> Result<(), AppError> {
     let (sender, receiver) = channel();
 
     glib::idle_add_local({
@@ -135,6 +140,7 @@ pub fn init(lua: Rc<Lua>) {
             eprintln!("Failed to start DBus server: {}", e);
         }
     });
+    Ok(())
 }
 
 async fn run_server(sender: Sender<DbusUpdate>) -> Result<(), Box<dyn Error>> {

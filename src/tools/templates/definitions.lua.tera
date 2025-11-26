@@ -1,0 +1,26 @@
+---@meta
+-- Auto-generated definitions for Ink. Do not edit manually.
+
+---@class WidgetConfig
+---@field type string
+---@field properties? table
+---@field signals? table
+---@field children? WidgetConfig[]
+
+{% for widget in widgets %}
+---@class {{ widget.name }}Props
+{% for prop in widget.properties %}
+---@field {{ prop.name }}? any -- {{ prop.type }}
+{% endfor %}
+
+---@class {{ widget.name }}Config : WidgetConfig
+---@field type "{{ widget.name }}"
+---@field properties? {{ widget.name }}Props
+{% if widget.name == "GtkApplicationWindow" %}
+---@field window_mode? "layer_shell" | "normal"
+---@field layer? "top" | "bottom" | "overlay" | "background"
+---@field anchors? { top: boolean, bottom: boolean, left: boolean, right: boolean }
+---@field keyboard_mode? "none" | "exclusive" | "on_demand"
+{% endif %}
+
+{% endfor %}

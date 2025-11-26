@@ -21,9 +21,7 @@ impl UserData for LuaApp {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method("launch", |_, this, ()| {
             let ctx: Option<&AppLaunchContext> = None;
-            if let Err(e) = this.0.launch(&[], ctx) {
-                eprintln!("Failed to launch app: {}", e);
-            }
+            this.0.launch(&[], ctx).map_err(mlua::Error::external)?;
             Ok(())
         });
     }

@@ -21,7 +21,10 @@ async fn main() {
     ui::catalog::init();
     let config = Config::parse();
     if let Some(Commands::Init { dir }) = config.command {
-        tools::generator::generate(dir).unwrap();
+        if let Err(e) = tools::generator::generate(dir) {
+            eprintln!("Error generating files: {}", e);
+            std::process::exit(1);
+        }
         return;
     }
     let target_file = if config.file.is_some() {
@@ -49,13 +52,15 @@ async fn main() {
         let context = AppContext::new(file.clone());
         let app_instance_context = Arc::new(context);
 
-        scripting::globals::init(
+        if let Err(e) = scripting::globals::init(
             lua.clone(),
             app.clone(),
             app_instance_context.clone(),
             ui_builder.clone(),
-        )
-        .expect("Failed to initialize globals");
+        ) {
+            eprintln!("Failed to initialize globals: {}", e);
+            std::process::exit(1);
+        };
 
         let mut app_instance = App::new(
             app.clone(),
@@ -64,7 +69,10 @@ async fn main() {
             config.windowed,
             ui_builder.clone(),
         );
-        app_instance.setup();
+        if let Err(e) = app_instance.setup() {
+            eprintln!("Error during application setup: {}", e);
+            std::process::exit(1);
+        }
         app.run_with_args::<&str>(&[]);
     } else {
         eprintln!("Error: No file provided.");

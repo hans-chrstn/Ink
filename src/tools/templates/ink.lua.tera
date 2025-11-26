@@ -1,5 +1,8 @@
+local cfg = require("config")
+---@type WindowConfig
 return {
 	type = "GtkApplicationWindow",
+  -- css_path = "path-to-your-css.css",
 	css = [[
         button {
             background-color: gray;
@@ -21,61 +24,39 @@ return {
     ]],
 	window_mode = "layer_shell",
 	layer = "top",
-	anchors = {
-		top = true,
-		left = true,
-		right = true,
-		bottom = false,
-	},
-	margins = {
-		top = 10,
-		left = 10,
-		right = 10,
-	},
+	anchors = { top = true, left = true, right = true, bottom = false },
+	margins = { top = 10, left = 10, right = 10 },
 	auto_exclusive_zone = true,
 	properties = {
+		title = "My Ink Bar",
 		default_height = 40,
 		css_classes = { "my-window" },
-		visible = true,
+    visible = true,
 	},
 	children = {
 		{
 			type = "GtkBox",
 			properties = {
 				orientation = "horizontal",
-				spacing = 12,
+				spacing = cfg.spacing,
 				hexpand = true,
-				css_classes = { "bar" },
+        css_classes = { "bar" },
 			},
 			children = {
-				{
-					type = "GtkLabel",
-					properties = {
-						label = "<b>Ink</b> System",
-						use_markup = true,
-					},
+				{ type = "GtkLabel", properties = { label = "<b>Ink</b> System", use_markup = true } },
+				{ 
+          type = "GtkButton", 
+          properties = { label = "Click Me" },
+					signals = { clicked = function() print("Button was clicked!") end },
 				},
 				{
 					type = "GtkButton",
-					properties = {
-						label = "Click Me",
-					},
+					properties = { label = "Exit" },
 					signals = {
-						clicked = function()
-							print("Button was clicked!")
-						end,
-					},
-				},
-				{
-					type = "GtkButton",
-					properties = {
-						label = "Exit",
-					},
-					signals = {
-						clicked = function()
-							exit()
-						end,
-					},
+            clicked = function()
+              exit()
+            end,
+          },
 				},
 			},
 		},

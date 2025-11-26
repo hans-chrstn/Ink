@@ -47,7 +47,7 @@ static CORE_CONTEXT_REGISTRY_KEY: OnceCell<RegistryKey> = OnceCell::new();
 pub fn get_core_context(lua: &Lua) -> mlua::Result<Rc<RefCell<CoreContext>>> {
     let key = CORE_CONTEXT_REGISTRY_KEY
         .get()
-        .expect("CORE_CONTEXT_REGISTRY_KEY not initialized");
+        .ok_or_else(|| mlua::Error::runtime("CORE_CONTEXT_REGISTRY_KEY not initialized"))?;
     let lua_core_context: LuaCoreContext = lua.registry_value(key)?;
     Ok(lua_core_context.0)
 }
@@ -93,7 +93,9 @@ fn init_clipboard_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> 
     clipboard_table.set(
         "set_text",
         lua.create_function(|_, text: String| {
-            let display = gdk::Display::default().expect("Could not get default display");
+            let display = gdk::Display::default().ok_or_else(|| {
+                mlua::Error::RuntimeError("Could not get default display".to_string())
+            })?;
             display.clipboard().set_text(&text);
             Ok(())
         })?,
@@ -104,7 +106,9 @@ fn init_clipboard_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> 
         lua.create_function({
             let lua = lua.clone();
             move |_, callback: Function| {
-                let display = gdk::Display::default().expect("Could not get default display");
+                let display = gdk::Display::default().ok_or_else(|| {
+                    mlua::Error::RuntimeError("Could not get default display".to_string())
+                })?;
                 let clipboard = display.clipboard();
                 let cb_key = lua.create_registry_value(callback)?;
                 let lua_clone = lua.clone();
@@ -250,16 +254,14 @@ fn init_utility_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
     let set_interval = lua.create_function(|lua, (ms, callback): (u32, Function)| {
         let lua = lua.clone();
         let cb_key = lua.create_registry_value(callback)?;
-        glib::timeout_add_local(std::time::Duration::from_millis(ms as u64), move || {
-            if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
-                if let Err(e) = func.call::<()>(()) {
-                    eprintln!("Interval Error: {}", e);
-                    return glib::ControlFlow::Break;
-                }
-            }
-            glib::ControlFlow::Continue
-        });
-        Ok(())
+                glib::timeout_add_local(std::time::Duration::from_millis(ms as u64), move || {
+                    if let Ok(func) = lua.registry_value::<Function>(&cb_key)
+                        && let Err(_e) = func.call::<()>(()) {
+                            return glib::ControlFlow::Break;
+                        }
+                    glib::ControlFlow::Continue
+                });
+                Ok(())
     })?;
     globals.set("set_interval", set_interval)?;
 
@@ -267,17 +269,18 @@ fn init_utility_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
         let lua = lua.clone();
         let cb_key = lua.create_registry_value(callback)?;
         glib::timeout_add_local_once(std::time::Duration::from_millis(ms as u64), move || {
-            if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
-                if let Err(e) = func.call::<()>(()) {
-                    eprintln!("set_timeout Error: {}", e);
-                }
+            if let Ok(func) = lua.registry_value::<Function>(&cb_key)
+                && let Err(e) = func.call::<()>(())
+            {
+                eprintln!("set_timeout Error: {}", e);
             }
         });
         Ok(())
     })?;
     globals.set("set_timeout", set_timeout)?;
-    let exec = lua
-        .create_function(|_, cmd: String| stdlib::exec(&cmd).map_err(mlua::Error::RuntimeError))?;
+    let exec = lua.create_function(|_, cmd: String| {
+        stdlib::exec(&cmd).map_err(|e| mlua::Error::RuntimeError(e.to_string()))
+    })?;
     globals.set("exec", exec)?;
     {
         let lua = lua.clone();
@@ -287,7 +290,11 @@ fn init_utility_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
             glib::MainContext::default().spawn_local(async move {
                 let result = stdlib::exec_async(cmd).await;
                 if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
-                    let _ = func.call::<()>(result);
+                    let lua_result = match result {
+                        Ok(s) => mlua::Result::Ok(s),
+                        Err(e) => mlua::Result::Err(mlua::Error::RuntimeError(e.to_string())),
+                    };
+                    let _ = func.call::<()>(lua_result);
                 }
             });
             Ok(())
@@ -298,7 +305,8 @@ fn init_utility_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
         |_, (method, uri, headers, body): (String, String, Option<mlua::Table>, Option<String>)| {
             let headers_map: Option<std::collections::HashMap<String, String>> =
                 headers.map(|t| t.pairs::<String, String>().filter_map(Result::ok).collect());
-            stdlib::fetch(&method, &uri, headers_map, body).map_err(mlua::Error::RuntimeError)
+            stdlib::fetch(&method, &uri, headers_map, body)
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))
         },
     )?;
     globals.set("fetch", fetch)?;
@@ -321,24 +329,29 @@ fn init_utility_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
             glib::MainContext::default().spawn_local(async move {
                 let result = stdlib::fetch_async(method, uri, headers_map, body).await;
                 if let Ok(func) = lua.registry_value::<Function>(&cb_key) {
-                    let lua_result_table = lua
-                        .create_table()
-                        .expect("Failed to create Lua table for result");
+                    let lua_result_table = match lua.create_table() {
+                        Ok(table) => table,
+                        Err(e) => {
+                            eprintln!("Failed to create Lua table for result: {}", e);
+                            return;
+                        }
+                    };
 
                     match result {
                         Ok(s) => {
-                            lua_result_table
-                                .set("ok", s)
-                                .expect("Failed to set 'ok' field");
+                            if let Err(e) = lua_result_table.set("ok", s) {
+                                eprintln!("Failed to set 'ok' field in Lua table: {}", e);
+                            }
                         }
                         Err(e) => {
-                            lua_result_table
-                                .set("err", e)
-                                .expect("Failed to set 'err' field");
+                            if let Err(e) = lua_result_table.set("err", e.to_string()) {
+                                eprintln!("Failed to set 'err' field in Lua table: {}", e);
+                            }
                         }
                     }
-                    func.call::<()>(lua_result_table)
-                        .expect("Error in Lua fetch_async callback");
+                    if let Err(e) = func.call::<()>(lua_result_table) {
+                        eprintln!("Error in Lua fetch_async callback: {}", e);
+                    }
                 }
             });
 
@@ -380,6 +393,6 @@ pub fn init(
     init_notification_function(&lua, &globals)?;
     init_utility_functions(&lua, &globals)?;
 
-    services::init(lua.clone())?;
+    services::init(lua.clone()).map_err(mlua::Error::external)?;
     Ok(())
 }

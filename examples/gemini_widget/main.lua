@@ -153,9 +153,9 @@ end
 
 return {
 	type = "GtkApplicationWindow",
+	title = "Gemini AI",
 	id = "main_window",
 	properties = {
-		title = "Gemini AI",
 		default_width = 400,
 		default_height = 600,
 		visible = true,

@@ -1,8 +1,50 @@
 use crate::scripting::traits::{ScriptArg, ScriptValue};
 use crate::scripting::widget_wrapper::LuaWidget;
 use mlua::{IntoLua, IntoLuaMulti, MultiValue, Value};
+use std::error::Error as StdError;
+use std::fmt;
+
+#[derive(Debug)]
+pub enum ScriptError {
+    LuaError(mlua::Error),
+    ConversionError(String),
+    Other(String),
+}
+
+impl fmt::Display for ScriptError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ScriptError::LuaError(e) => write!(f, "Lua error: {}", e),
+            ScriptError::ConversionError(e) => write!(f, "Script conversion error: {}", e),
+            ScriptError::Other(e) => write!(f, "Script error: {}", e),
+        }
+    }
+}
+
+impl StdError for ScriptError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            ScriptError::LuaError(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<mlua::Error> for ScriptError {
+    fn from(err: mlua::Error) -> Self {
+        ScriptError::LuaError(err)
+    }
+}
+
+impl From<ScriptError> for mlua::Error {
+    fn from(err: ScriptError) -> Self {
+        mlua::Error::external(err)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct LuaWrapper(pub Value);
+
 impl IntoLua for ScriptArg {
     fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<Value> {
         match self {
@@ -24,15 +66,25 @@ impl IntoLuaMulti for ScriptArgs {
         Ok(MultiValue::from_vec(vals))
     }
 }
-fn lua_to_script_arg(val: Value) -> ScriptArg {
+fn lua_to_script_arg(val: Value) -> Result<ScriptArg, ScriptError> {
     match val {
-        Value::Boolean(b) => ScriptArg::Bool(b),
-        Value::String(s) => {
-            ScriptArg::String(s.to_str().ok().map(|bs| bs.to_string()).unwrap_or_default())
-        }
-        Value::Number(n) => ScriptArg::Number(n),
-        Value::Integer(i) => ScriptArg::Number(i as f64),
-        _ => ScriptArg::Nil,
+        Value::Nil => Ok(ScriptArg::Nil),
+        Value::Boolean(b) => Ok(ScriptArg::Bool(b)),
+        Value::String(s) => s
+            .to_str()
+            .map(|bs| ScriptArg::String(bs.to_string()))
+            .map_err(|e| {
+                ScriptError::ConversionError(format!(
+                    "Failed to convert Lua string to Rust string: {}",
+                    e
+                ))
+            }),
+        Value::Number(n) => Ok(ScriptArg::Number(n)),
+        Value::Integer(i) => Ok(ScriptArg::Number(i as f64)),
+        _ => Err(ScriptError::ConversionError(format!(
+            "Unsupported Lua type for ScriptArg conversion: {:?}",
+            val
+        ))),
     }
 }
 impl ScriptValue for LuaWrapper {
@@ -104,7 +156,7 @@ impl ScriptValue for LuaWrapper {
     fn call(&self, args: Vec<ScriptArg>) -> Result<ScriptArg, String> {
         if let Value::Function(f) = &self.0 {
             let result: Value = f.call(ScriptArgs(args)).map_err(|e| e.to_string())?;
-            Ok(lua_to_script_arg(result))
+            Ok(lua_to_script_arg(result).map_err(|e| e.to_string())?)
         } else {
             Err("Not a function".into())
         }

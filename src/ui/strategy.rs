@@ -1,11 +1,12 @@
 use crate::scripting::traits::ScriptValue;
 use crate::ui::traits::{WidgetBehavior, WidgetContainer};
-use gtk4::prelude::*;
 use gtk4::Widget;
+use gtk4::prelude::*;
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 pub struct WindowStrategy {
     pub force_windowed: bool,
 }
+
 impl WindowStrategy {
     pub fn new(force_windowed: bool) -> Self {
         Self { force_windowed }
@@ -15,16 +16,7 @@ impl WindowStrategy {
             w.set_anchor(edge, val);
         }
     }
-}
-impl<T: ScriptValue + 'static> WidgetBehavior<T> for WindowStrategy {
-    fn apply(&self, widget: &Widget, data: &T) {
-        let Some(window) = widget.downcast_ref::<gtk4::Window>() else {
-            return;
-        };
-        if self.force_windowed {
-            window.present();
-            return;
-        }
+    fn connect_keybindings<T: ScriptValue + 'static>(window: &gtk4::Window, data: &T) {
         if let Some(maps) = data
             .get_property("keymaps")
             .and_then(|v| v.get_map_entries())
@@ -52,11 +44,19 @@ impl<T: ScriptValue + 'static> WidgetBehavior<T> for WindowStrategy {
             });
             window.add_controller(controller);
         }
+    }
+
+    fn apply_window_mode<T: ScriptValue>(
+        strategy: &WindowStrategy,
+        window: &gtk4::Window,
+        data: &T,
+    ) {
         let mode = data
             .get_property("window_mode")
             .and_then(|v| v.as_string())
             .unwrap_or_else(|| "layer_shell".into());
-        if mode == "normal" {
+
+        if strategy.force_windowed || mode == "normal" {
             if window.is_visible() {
                 window.present();
             }
@@ -66,6 +66,9 @@ impl<T: ScriptValue + 'static> WidgetBehavior<T> for WindowStrategy {
         if window.is_visible() {
             window.present();
         }
+    }
+
+    fn apply_layer_shell_properties<T: ScriptValue>(window: &gtk4::Window, data: &T) {
         let layer = match data
             .get_property("layer")
             .and_then(|v| v.as_string())
@@ -77,16 +80,18 @@ impl<T: ScriptValue + 'static> WidgetBehavior<T> for WindowStrategy {
             _ => Layer::Top,
         };
         window.set_layer(layer);
+
         if let Some(anchors) = data.get_property("anchors") {
-            Self::set_anchor(window, &anchors, "top", Edge::Top);
-            Self::set_anchor(window, &anchors, "bottom", Edge::Bottom);
-            Self::set_anchor(window, &anchors, "left", Edge::Left);
-            Self::set_anchor(window, &anchors, "right", Edge::Right);
+            WindowStrategy::set_anchor(window, &anchors, "top", Edge::Top);
+            WindowStrategy::set_anchor(window, &anchors, "bottom", Edge::Bottom);
+            WindowStrategy::set_anchor(window, &anchors, "left", Edge::Left);
+            WindowStrategy::set_anchor(window, &anchors, "right", Edge::Right);
         } else {
             window.set_anchor(Edge::Top, true);
             window.set_anchor(Edge::Left, true);
             window.set_anchor(Edge::Right, true);
         }
+
         if let Some(z) = data
             .get_property("exclusive_zone")
             .and_then(|v| v.as_integer())
@@ -98,6 +103,7 @@ impl<T: ScriptValue + 'static> WidgetBehavior<T> for WindowStrategy {
         {
             window.auto_exclusive_zone_enable();
         }
+
         let kb_mode = data
             .get_property("keyboard_mode")
             .and_then(|v| v.as_string())
@@ -110,6 +116,21 @@ impl<T: ScriptValue + 'static> WidgetBehavior<T> for WindowStrategy {
         window.set_keyboard_mode(mode);
     }
 }
+impl<T: ScriptValue + 'static> WidgetBehavior<T> for WindowStrategy {
+    fn apply(&self, widget: &Widget, data: &T) {
+        let Some(window) = widget.downcast_ref::<gtk4::Window>() else {
+            return;
+        };
+        if self.force_windowed {
+            window.present();
+            return;
+        }
+
+        Self::connect_keybindings(window, data);
+        Self::apply_window_mode(self, window, data);
+        Self::apply_layer_shell_properties(window, data);
+    }
+}
 #[derive(Clone)]
 pub struct GridStrategy {
     grid: gtk4::Grid,
@@ -118,25 +139,27 @@ impl GridStrategy {
     pub fn new(grid: gtk4::Grid) -> Self {
         Self { grid }
     }
+
+    fn get_grid_value<T: ScriptValue>(data: &T, props: &Option<T>, key: &str, default: i32) -> i32 {
+        if let Some(v) = data.get_property(key).and_then(|x| x.as_integer()) {
+            return v as i32;
+        }
+        if let Some(p) = props
+            && let Some(v) = p.get_property(key).and_then(|x| x.as_integer())
+        {
+            return v as i32;
+        }
+        default
+    }
 }
 impl<T: ScriptValue> WidgetContainer<T> for GridStrategy {
-    fn add_child(&self, child: &Widget, data: &T) {
+    fn add_child(&self, child: &Widget, data: &T) -> Result<(), String> {
         let props = data.get_property("properties");
-        let get_val = |key: &str, default: i32| -> i32 {
-            if let Some(v) = data.get_property(key).and_then(|x| x.as_integer()) {
-                return v as i32;
-            }
-            if let Some(p) = &props {
-                if let Some(v) = p.get_property(key).and_then(|x| x.as_integer()) {
-                    return v as i32;
-                }
-            }
-            default
-        };
-        let col = get_val("grid_col", 0);
-        let row = get_val("grid_row", 0);
-        let w = get_val("grid_width", 1);
-        let h = get_val("grid_height", 1);
+        let col = Self::get_grid_value(data, &props, "grid_col", 0);
+        let row = Self::get_grid_value(data, &props, "grid_row", 0);
+        let w = Self::get_grid_value(data, &props, "grid_width", 1);
+        let h = Self::get_grid_value(data, &props, "grid_height", 1);
         self.grid.attach(child, col, row, w, h);
+        Ok(())
     }
 }

@@ -1,7 +1,7 @@
 use crate::scripting::lua_driver::LuaWrapper;
 use crate::ui::registry::Registry;
-use gtk4::glib::prelude::*;
 use gtk4::glib::Type as GType;
+use gtk4::glib::prelude::*;
 use gtk4::prelude::*;
 use mlua::{Error, FromLua, Function, Lua, UserData, UserDataMethods, Value};
 
@@ -42,16 +42,12 @@ impl FromLua for LuaWidget {
 pub struct LuaAdjustment(pub gtk4::Adjustment);
 impl UserData for LuaAdjustment {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("get_value", |_, this, ()| {
-            Ok(this.0.value())
-        });
+        methods.add_method("get_value", |_, this, ()| Ok(this.0.value()));
         methods.add_method("set_value", |_, this, value: f64| {
             this.0.set_value(value);
             Ok(())
         });
-        methods.add_method("get_upper", |_, this, ()| {
-            Ok(this.0.upper())
-        });
+        methods.add_method("get_upper", |_, this, ()| Ok(this.0.upper()));
     }
 }
 
@@ -113,9 +109,7 @@ impl UserData for LuaWidget {
             Ok(())
         });
 
-        methods.add_method("is_visible", |_, this, ()| {
-            Ok(this.0.is_visible())
-        });
+        methods.add_method("is_visible", |_, this, ()| Ok(this.0.is_visible()));
         methods.add_method("add_class", |_, this, class: String| {
             this.0.add_css_class(&class);
             Ok(())
@@ -195,7 +189,9 @@ impl UserData for LuaWidget {
         methods.add_method("get_vadjustment", |lua, this, ()| {
             if let Some(scrolled_window) = this.0.downcast_ref::<gtk4::ScrolledWindow>() {
                 let adj = scrolled_window.vadjustment();
-                return Ok(mlua::Value::UserData(lua.create_userdata(LuaAdjustment(adj))?));
+                return Ok(mlua::Value::UserData(
+                    lua.create_userdata(LuaAdjustment(adj))?,
+                ));
             }
             Ok(mlua::Value::Nil)
         });
@@ -225,7 +221,9 @@ impl UserData for LuaWidget {
             let type_name = this.0.type_().name();
             let strategy = Registry::get_strategy(type_name, &this.0);
             let wrapper = LuaWrapper(props);
-            strategy.add_child(&child.0, &wrapper);
+            strategy
+                .add_child(&child.0, &wrapper)
+                .map_err(mlua::Error::RuntimeError)?;
             Ok(())
         });
         methods.add_method("set_property", |_, this, (key, val): (String, Value)| {

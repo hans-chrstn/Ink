@@ -7,8 +7,7 @@ pub struct Config {
     pub command: Option<Commands>,
     #[arg(global = true)]
     pub file: Option<PathBuf>,
-    #[arg(long, global = true)]
-    pub main_path: Option<PathBuf>,
+
     #[arg(long, global = true)]
     pub windowed: bool,
 }

@@ -1,14 +1,19 @@
 use crate::ui::registry::Registry;
 use gtk4::glib::object::ObjectClass;
 use gtk4::prelude::*;
-use std::fs::{self, File};
-use std::io::Write;
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
+use tera::{Context, Tera};
 pub fn generate(target_dir: Option<PathBuf>) -> std::io::Result<()> {
     let dir = match target_dir {
         Some(d) => d,
         None => {
-            let home = std::env::var("HOME").expect("Could not find HOME directory");
+            let home = std::env::var("HOME").map_err(|e| {
+                io::Error::other(
+                    format!("Could not find HOME directory: {}", e),
+                )
+            })?;
             PathBuf::from(home).join(".config").join("ink")
         }
     };
@@ -22,54 +27,42 @@ pub fn generate(target_dir: Option<PathBuf>) -> std::io::Result<()> {
     Ok(())
 }
 fn generate_definitions(path: &Path) -> std::io::Result<()> {
-    let mut f = File::create(path)?;
-    writeln!(f, "---@meta")?;
-    writeln!(
-        f,
-        "-- Auto-generated definitions for Ink. Do not edit manually."
-    )?;
-    writeln!(f, "")?;
-    writeln!(f, "---@class WidgetConfig")?;
-    writeln!(f, "---@field type string")?;
-    writeln!(f, "---@field properties? table")?;
-    writeln!(f, "---@field signals? table")?;
-    writeln!(f, "---@field children? WidgetConfig[]")?;
-    writeln!(f, "")?;
+            let mut tera = Tera::new("src/tools/templates/**/*").map_err(|e| {
+                io::Error::other(
+                    format!("Failed to create Tera instance: {}", e),
+                )
+            })?;    tera.autoescape_on(vec![]);
+
+    let mut context = Context::new();
+    let mut widgets_data = Vec::new();
+
     for t in Registry::get_all_types() {
-        let name = t.name();
-        let props_name = format!("{}Props", name);
-        writeln!(f, "---@class {}", props_name)?;
+        let name = t.name().to_string();
+        let mut properties = Vec::new();
+
         if let Some(oc) = ObjectClass::from_type(t) {
             for p in oc.list_properties() {
-                writeln!(
-                    f,
-                    "---@field {}? any -- {}",
-                    p.name().replace('-', "_"),
-                    p.value_type().name()
-                )?;
+                properties.push(serde_json::json!({
+                    "name": p.name().replace('-', "_"),
+                    "type": p.value_type().name(),
+                }));
             }
         }
-        writeln!(f, "")?;
-        writeln!(f, "---@class {}Config : WidgetConfig", name)?;
-        writeln!(f, "---@field type \"{}\"", name)?;
-        writeln!(f, "---@field properties? {}", props_name)?;
-        if name == "GtkApplicationWindow" {
-            writeln!(f, "---@field window_mode? \"layer_shell\" | \"normal\"")?;
-            writeln!(
-                f,
-                "---@field layer? \"top\" | \"bottom\" | \"overlay\" | \"background\""
-            )?;
-            writeln!(
-                f,
-                "---@field anchors? {{ top: boolean, bottom: boolean, left: boolean, right: boolean }}"
-            )?;
-            writeln!(
-                f,
-                "---@field keyboard_mode? \"none\" | \"exclusive\" | \"on_demand\""
-            )?;
-        }
-        writeln!(f, "")?;
+
+        widgets_data.push(serde_json::json!({
+            "name": name,
+            "properties": properties,
+        }));
     }
+
+    context.insert("widgets", &widgets_data);
+
+    let rendered = tera.render("definitions.lua.tera", &context).map_err(|e| {
+        io::Error::other(
+            format!("Failed to render definitions.lua.tera: {}", e),
+        )
+    })?;
+    fs::write(path, rendered)?;
     Ok(())
 }
 fn generate_luarc(path: &Path) -> std::io::Result<()> {
@@ -95,81 +88,35 @@ fn generate_main(path: &Path) -> std::io::Result<()> {
     if path.exists() {
         return Ok(());
     }
-    let content = r#"local cfg = require("config")
----@type WindowConfig
-return {
-	type = "GtkApplicationWindow",
-  -- css_path = "path-to-your-css.css",
-	css = [[
-        button {
-            background-color: gray;
-            color: black;
-            border-radius: 12px;
-        }
-        label {
-            font-size: 20px;
-            color: black;
-        }
-        .my-window {
-          background-color: white;
-          border-radius: 20px;
-          margin: 5px;
-        }
-        .bar {
-          padding: 5px;
-        }
-    ]],
-	window_mode = "layer_shell",
-	layer = "top",
-	anchors = { top = true, left = true, right = true, bottom = false },
-	margins = { top = 10, left = 10, right = 10 },
-	auto_exclusive_zone = true,
-	properties = {
-		title = "My Ink Bar",
-		default_height = 40,
-		css_classes = { "my-window" },
-    visible = true,
-	},
-	children = {
-		{
-			type = "GtkBox",
-			properties = {
-				orientation = "horizontal",
-				spacing = cfg.spacing,
-				hexpand = true,
-        css_classes = { "bar" },
-			},
-			children = {
-				{ type = "GtkLabel", properties = { label = "<b>Ink</b> System", use_markup = true } },
-				{ 
-          type = "GtkButton", 
-          properties = { label = "Click Me" },
-					signals = { clicked = function() print("Button was clicked!") end },
-				},
-				{
-					type = "GtkButton",
-					properties = { label = "Exit" },
-					signals = {
-            clicked = function()
-              exit()
-            end,
-          },
-				},
-			},
-		},
-	},
-}"#;
-    fs::write(path, content)?;
+    let tera = Tera::new("src/tools/templates/**/*").map_err(|e| {
+        io::Error::other(
+            format!("Failed to create Tera instance: {}", e),
+        )
+    })?;
+    let context = Context::new();
+    let rendered = tera.render("ink.lua.tera", &context).map_err(|e| {
+        io::Error::other(
+            format!("Failed to render ink.lua.tera: {}", e),
+        )
+    })?;
+    fs::write(path, rendered)?;
     Ok(())
 }
 fn generate_config(path: &Path) -> std::io::Result<()> {
     if path.exists() {
         return Ok(());
     }
-    let content = r##"return {
-    spacing = 12,
-    primary_color = "#blue"
-}"##;
-    fs::write(path, content)?;
+    let tera = Tera::new("src/tools/templates/**/*").map_err(|e| {
+        io::Error::other(
+            format!("Failed to create Tera instance: {}", e),
+        )
+    })?;
+    let context = Context::new();
+    let rendered = tera.render("config.lua.tera", &context).map_err(|e| {
+        io::Error::other(
+            format!("Failed to render config.lua.tera: {}", e),
+        )
+    })?;
+    fs::write(path, rendered)?;
     Ok(())
 }

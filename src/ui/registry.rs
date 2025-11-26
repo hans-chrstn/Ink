@@ -5,7 +5,8 @@ use gtk4::glib::Type;
 use gtk4::prelude::*;
 use std::collections::HashMap;
 use std::sync::{OnceLock, RwLock};
-type StrategyFactory = Box<dyn Fn(&gtk4::Widget) -> Box<dyn WidgetContainer<LuaWrapper>> + Send + Sync>;
+type StrategyFactory =
+    Box<dyn Fn(&gtk4::Widget) -> Box<dyn WidgetContainer<LuaWrapper>> + Send + Sync>;
 pub struct Registry {
     types: HashMap<String, Type>,
     strategies: HashMap<String, StrategyFactory>,
@@ -23,7 +24,9 @@ impl Registry {
     pub fn register_leaf<T: IsA<gtk4::Widget> + StaticType>() {
         Self::register_impl::<T>(Box::new(|_| Box::new(LeafStrategy)));
     }
-    pub fn register_container<T: IsA<gtk4::Widget> + StaticType + WidgetContainer<LuaWrapper> + Clone>() {
+    pub fn register_container<
+        T: IsA<gtk4::Widget> + StaticType + WidgetContainer<LuaWrapper> + Clone,
+    >() {
         Self::register_impl::<T>(Box::new(|w| {
             if let Some(obj) = w.downcast_ref::<T>() {
                 Box::new(obj.clone())
@@ -32,14 +35,14 @@ impl Registry {
             }
         }));
     }
-    
+
     pub fn register_grid() {
         Self::register_impl::<gtk4::Grid>(Box::new(|w| {
-             if let Some(grid) = w.downcast_ref::<gtk4::Grid>() {
-                 Box::new(GridStrategy::new(grid.clone()))
-             } else {
-                 Box::new(LeafStrategy)
-             }
+            if let Some(grid) = w.downcast_ref::<gtk4::Grid>() {
+                Box::new(GridStrategy::new(grid.clone()))
+            } else {
+                Box::new(LeafStrategy)
+            }
         }));
     }
     fn register_impl<T: StaticType>(factory: StrategyFactory) {
@@ -61,6 +64,12 @@ impl Registry {
         }
     }
     pub fn get_all_types() -> Vec<Type> {
-        Self::global().read().unwrap().types.values().copied().collect()
+        Self::global()
+            .read()
+            .unwrap()
+            .types
+            .values()
+            .copied()
+            .collect()
     }
 }

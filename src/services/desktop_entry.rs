@@ -22,11 +22,7 @@ impl DesktopEntry {
         for line in content.lines() {
             let line = line.trim();
             if line.starts_with('[') && line.ends_with(']') {
-                if line == "[Desktop Entry]" {
-                    in_desktop_entry_section = true;
-                } else {
-                    in_desktop_entry_section = false;
-                }
+                in_desktop_entry_section = line == "[Desktop Entry]";
                 continue;
             }
 

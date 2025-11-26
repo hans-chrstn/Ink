@@ -8,9 +8,16 @@ impl SignalConnector {
         let widget_clone = widget.clone();
         widget.connect_local(name, false, move |values: &[glib::Value]| {
             let mut args: Vec<ScriptArg> = Vec::new();
-            args.push(ScriptArg::Widget(
-                widget_clone.clone().downcast::<gtk4::Widget>().unwrap(),
-            ));
+            args.push(
+                widget_clone
+                    .clone()
+                    .downcast::<gtk4::Widget>()
+                    .map(ScriptArg::Widget)
+                    .unwrap_or_else(|_| {
+                        eprintln!("Error: downcast to Gtk.Widget failed for widget_clone in signal handler.");
+                        ScriptArg::Nil
+                    }),
+            );
 
             for val in values {
                 if let Ok(w) = val.get::<gtk4::Widget>() {
@@ -24,6 +31,10 @@ impl SignalConnector {
                 } else if let Ok(i) = val.get::<i64>() {
                     args.push(ScriptArg::Number(i as f64));
                 } else {
+                    eprintln!(
+                        "Warning: Unhandled glib::Value type for signal argument: {:?}",
+                        val.type_()
+                    );
                     args.push(ScriptArg::Nil);
                 }
             }

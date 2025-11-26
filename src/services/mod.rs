@@ -16,7 +16,7 @@ pub fn init(lua: Rc<Lua>) -> Result<()> {
     system::register(&lua)?;
     json::register(&lua)?;
     fs::register(lua.clone())?;
-    dbus_service::init(lua.clone());
+    dbus_service::init(lua.clone()).map_err(mlua::Error::external)?;
     tray_api::register(lua.clone())?;
     Ok(())
 }

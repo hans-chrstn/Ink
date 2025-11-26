@@ -1,0 +1,4 @@
+return {
+    spacing = 12,
+    primary_color = "#blue"
+}

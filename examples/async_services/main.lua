@@ -98,8 +98,14 @@ return {
 					properties = { label = "Check Battery & Wifi" },
 					signals = {
 						clicked = function(self)
-							local cap, status = System.get_battery()
-							self:set_property("label", "Checking Wifi...")
+							local success, cap, status = pcall(System.get_battery)
+							local battery_info_str
+							if success and cap ~= nil then
+								battery_info_str = "Battery: " .. cap .. "% (" .. status .. ")"
+							else
+								battery_info_str = "No Battery Found" -- Simplified message
+							end
+							self:set_property("label", battery_info_str)
 							exec_async("nmcli -t -f active,ssid dev wifi | grep '^yes' | cut -d: -f2", function(ssid)
 								print("Wifi SSID: " .. ssid)
 							end)
@@ -113,9 +119,9 @@ return {
 						clicked = function()
 							fetch_async("GET", "https://api.ipify.org", nil, nil, function(result)
 								if result.ok then
-									print("My IP: " .. result.ok)
+									print("My IP: " .. tostring(result.ok))
 								else
-									print("Fetch Error: " .. result.err)
+									print("Fetch Error: " .. tostring(result.err))
 								end
 							end)
 						end,

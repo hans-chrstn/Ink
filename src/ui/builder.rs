@@ -68,6 +68,22 @@ impl UiBuilder {
     }
 
     fn build_recursive(&self, data: &LuaWrapper, config_dir: &Path) -> Result<Widget, String> {
+        let (widget, type_name) = self.instantiate_widget(data)?;
+
+        self.register_widget_id(data, &widget);
+
+        self.set_widget_properties(data, &widget, &type_name, config_dir)?;
+
+        self.connect_widget_signals(data, &widget);
+
+        self.add_widget_children(data, &widget, &type_name, config_dir)?;
+
+        self.apply_widget_behavior(&widget, &type_name, data);
+
+        Ok(widget)
+    }
+
+    fn instantiate_widget(&self, data: &LuaWrapper) -> Result<(Widget, String), String> {
         let type_name = data
             .get_property("type")
             .and_then(|v| v.as_string())
@@ -81,14 +97,25 @@ impl UiBuilder {
             .downcast::<Widget>()
             .map_err(|_| "Not a widget".to_string())?;
 
-        if let Some(id_val) = data.get_property("id") {
-            if let Some(id_str) = id_val.as_string() {
+        Ok((widget, type_name))
+    }
+
+    fn register_widget_id(&self, data: &LuaWrapper, widget: &Widget) {
+        if let Some(id_val) = data.get_property("id")
+            && let Some(id_str) = id_val.as_string() {
                 self.widgets_by_id
                     .borrow_mut()
                     .insert(id_str, widget.clone());
-            }
-        }
+            };
+    }
 
+    fn set_widget_properties(
+        &self,
+        data: &LuaWrapper,
+        widget: &Widget,
+        type_name: &str,
+        config_dir: &Path,
+    ) -> Result<(), String> {
         if let Some(props) = data
             .get_property("properties")
             .and_then(|v| v.get_map_entries())
@@ -119,17 +146,12 @@ impl UiBuilder {
                                 .map_err(|e| format!("Failed to create Lua string: {}", e))?;
                             let resolved_path_wrapper = LuaWrapper(mlua::Value::String(lua_string));
 
-                            if let Some(gval) = GenericConverter::to_gvalue(
+                            let gval = GenericConverter::to_gvalue(
                                 &resolved_path_wrapper,
                                 pspec.value_type(),
-                            ) {
-                                widget.set_property(&k, gval);
-                            } else {
-                                return Err(format!(
-                                    "Failed to convert resolved path for property '{}' on type '{}'",
-                                    k, type_name
-                                ));
-                            }
+                            )
+                            .map_err(|e| format!("Failed to convert path property: {}", e))?;
+                            widget.set_property(&k, gval);
                         } else {
                             return Err(format!(
                                 "Property '{}' on type '{}' expects a string, but got non-string value",
@@ -137,9 +159,9 @@ impl UiBuilder {
                             ));
                         }
                     } else {
-                        if let Some(gval) = GenericConverter::to_gvalue(&v, pspec.value_type()) {
-                            widget.set_property(&k, gval);
-                        }
+                        let gval = GenericConverter::to_gvalue(&v, pspec.value_type())
+                            .map_err(|e| format!("Failed to convert property: {}", e))?;
+                        widget.set_property(&k, gval);
                     }
                 } else {
                     return Err(format!(
@@ -149,7 +171,10 @@ impl UiBuilder {
                 }
             }
         }
+        Ok(())
+    }
 
+    fn connect_widget_signals(&self, data: &LuaWrapper, widget: &Widget) {
         if let Some(sigs) = data
             .get_property("signals")
             .and_then(|v| v.get_map_entries())
@@ -160,22 +185,31 @@ impl UiBuilder {
                 }
             }
         }
+    }
 
+    fn add_widget_children(
+        &self,
+        data: &LuaWrapper,
+        widget: &Widget,
+        type_name: &str,
+        config_dir: &Path,
+    ) -> Result<(), String> {
         if let Some(children) = data
             .get_property("children")
             .and_then(|v| v.get_array_items())
         {
-            let strategy = Registry::get_strategy(&type_name, &widget);
+            let strategy = Registry::get_strategy(type_name, widget);
             for child_data in children {
                 let child_widget = self.build_recursive(&child_data, config_dir)?;
-                strategy.add_child(&child_widget, &child_data);
+                strategy.add_child(&child_widget, &child_data)?;
             }
         }
+        Ok(())
+    }
 
-        if let Some(behavior) = self.behaviors.get(&type_name) {
-            behavior.apply(&widget, data);
+    fn apply_widget_behavior(&self, widget: &Widget, type_name: &str, data: &LuaWrapper) {
+        if let Some(behavior) = self.behaviors.get(type_name) {
+            behavior.apply(widget, data);
         }
-
-        Ok(widget)
     }
 }

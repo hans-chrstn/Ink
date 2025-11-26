@@ -1,10 +1,52 @@
 use std::collections::HashMap;
+use std::error::Error as StdError;
+use std::fmt;
+use std::io;
 use std::process::Command;
 use std::thread;
 
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 
-fn pango_escape_text(text: &str) -> String {
+#[derive(Debug)]
+pub enum StdLibError {
+    Io(io::Error),
+    Reqwest(reqwest::Error),
+    Command(String),
+}
+
+impl fmt::Display for StdLibError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StdLibError::Io(e) => write!(f, "I/O error: {}", e),
+            StdLibError::Reqwest(e) => write!(f, "Request error: {}", e),
+            StdLibError::Command(e) => write!(f, "Command execution error: {}", e),
+        }
+    }
+}
+
+impl StdError for StdLibError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            StdLibError::Io(e) => Some(e),
+            StdLibError::Reqwest(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<io::Error> for StdLibError {
+    fn from(err: io::Error) -> Self {
+        StdLibError::Io(err)
+    }
+}
+
+impl From<reqwest::Error> for StdLibError {
+    fn from(err: reqwest::Error) -> Self {
+        StdLibError::Reqwest(err)
+    }
+}
+
+pub fn pango_escape_text(text: &str) -> String {
     let mut escaped = String::new();
     for c in text.chars() {
         match c {
@@ -19,16 +61,16 @@ fn pango_escape_text(text: &str) -> String {
     escaped
 }
 
-pub fn exec(cmd: &str) -> Result<String, String> {
+pub fn exec(cmd: &str) -> Result<String, StdLibError> {
     let output = Command::new("sh")
         .arg("-c")
         .arg(cmd)
         .output()
-        .map_err(|e| e.to_string())?;
+        .map_err(StdLibError::Io)?;
 
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr).to_string();
-        return Err(format!("Error: {}", err));
+        return Err(StdLibError::Command(err));
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
@@ -55,7 +97,7 @@ pub fn fetch(
     uri: &str,
     headers: Option<HashMap<String, String>>,
     body: Option<String>,
-) -> Result<String, String> {
+) -> Result<String, StdLibError> {
     let client = reqwest::blocking::Client::new();
     let mut request = match method.to_lowercase().as_str() {
         "post" => client.post(uri),
@@ -76,22 +118,22 @@ pub fn fetch(
 
     request
         .send()
-        .map_err(|e| e.to_string())?
+        .map_err(StdLibError::Reqwest)?
         .text()
-        .map_err(|e| e.to_string())
+        .map_err(StdLibError::Reqwest)
 }
 
-pub async fn exec_async(cmd: String) -> Result<String, String> {
+pub async fn exec_async(cmd: String) -> Result<String, StdLibError> {
     let output = tokio::process::Command::new("sh")
         .arg("-c")
         .arg(cmd)
         .output()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(StdLibError::Io)?;
 
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr).to_string();
-        return Err(format!("Error: {}", err));
+        return Err(StdLibError::Command(err));
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
@@ -102,7 +144,7 @@ pub async fn fetch_async(
     uri: String,
     headers: Option<HashMap<String, String>>,
     body: Option<String>,
-) -> Result<String, String> {
+) -> Result<String, StdLibError> {
     let client = reqwest::Client::new();
     let mut request = match method.to_lowercase().as_str() {
         "post" => client.post(&uri),
@@ -124,10 +166,10 @@ pub async fn fetch_async(
     request
         .send()
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(StdLibError::Reqwest)?
         .text()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(StdLibError::Reqwest)
 }
 
 pub fn markdown_to_pango(markdown: &str) -> String {
