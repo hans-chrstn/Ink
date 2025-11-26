@@ -107,7 +107,7 @@
         config = lib.mkOption {
           type = lib.types.nullOr lib.types.lines;
           default = null;
-          description = "Content of main.lua";
+          description = "Content of init.lua";
         };
 
         modules = lib.mkOption {
@@ -124,7 +124,7 @@
           mainConfig =
             if cfg.config != null
             then {
-              "ink/main.lua".text = cfg.config;
+              "ink/init.lua".text = cfg.config;
             }
             else {};
 

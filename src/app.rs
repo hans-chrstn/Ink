@@ -8,10 +8,10 @@ use gio;
 use gtk4::gdk::Display;
 use gtk4::{Application, CssProvider, prelude::*};
 use mlua::{Function, Lua};
+use std::cell::RefCell;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::cell::RefCell;
 use std::sync::Arc;
 
 pub struct App {
@@ -97,6 +97,22 @@ fn load_and_build_ui(
             .set("INK_MAIN_FILE_PATH", main_file_str)
             .expect("Failed to set INK_MAIN_FILE_PATH");
     }
+
+    let package: mlua::Table = lua
+        .globals()
+        .get("package")
+        .expect("Failed to get package global");
+    let old_path: String = package.get("path").expect("Failed to get package.path");
+    let new_path = format!(
+        "{}/?.lua;{}/?/init.lua;{}",
+        config_dir.to_string_lossy(),
+        config_dir.to_string_lossy(),
+        old_path
+    );
+    package
+        .set("path", new_path)
+        .expect("Failed to set package.path");
+
     if !main_file_path.exists() {
         error::handle_error(
             app,
@@ -217,9 +233,10 @@ fn load_and_build_ui(
 
                 for config in window_configs {
                     let wrapped = LuaWrapper(config);
-                    
+
                     let mut builder = ui_builder.borrow_mut();
-                    builder.register_behavior(
+                    builder
+                        .register_behavior(
                             "GtkApplicationWindow",
                             Box::new(WindowStrategy::new(windowed)),
                         )
@@ -314,3 +331,4 @@ fn build_menu_from_lua(menu_table: mlua::Table) -> gio::Menu {
     }
     menu
 }
+

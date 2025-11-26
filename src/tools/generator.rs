@@ -17,7 +17,7 @@ pub fn generate(target_dir: Option<PathBuf>) -> std::io::Result<()> {
     }
     generate_definitions(&dir.join("definitions.lua"))?;
     generate_luarc(&dir.join(".luarc.json"))?;
-    generate_main(&dir.join("main.lua"))?;
+    generate_main(&dir.join("init.lua"))?;
     generate_config(&dir.join("config.lua"))?;
     Ok(())
 }
@@ -149,7 +149,11 @@ return {
 				{
 					type = "GtkButton",
 					properties = { label = "Exit" },
-					signals = { clicked = exit() },
+					signals = {
+            clicked = function()
+              exit()
+            end,
+          },
 				},
 			},
 		},

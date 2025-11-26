@@ -75,7 +75,7 @@ return {
 					},
 					signals = {
 						clicked = function()
-							print("Exit clicked")
+							exit()
 						end,
 					},
 				},
