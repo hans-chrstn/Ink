@@ -161,4 +161,13 @@ Ink provides a number of services that can be accessed from your Lua scripts.
 
 ## Examples
 
-The `examples` directory contains a number of example scripts that demonstrate how to use the different features of Ink.
+### Gemini Widget
+
+![Gemini AI Widget](examples/gemini/gemini.png)
+
+### Weather Widget
+
+![Weather Widget](examples/weather/weather.png)
+
+There are several more in the `examples/` directory
+
