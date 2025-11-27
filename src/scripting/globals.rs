@@ -364,6 +364,10 @@ fn init_utility_functions(lua: &Rc<Lua>, globals: &mlua::Table) -> Result<()> {
         Ok(())
     })?;
     globals.set("spawn", spawn)?;
+
+    let graphemes = lua.create_function(|_, s: String| Ok(stdlib::graphemes(&s)))?;
+    globals.set("graphemes", graphemes)?;
+
     Ok(())
 }
 

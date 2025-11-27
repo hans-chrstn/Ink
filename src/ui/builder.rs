@@ -21,7 +21,6 @@ const ALLOWED_TOP_LEVEL_KEYS: &[&str] = &[
     "properties",
     "signals",
     "children",
-
     "window_mode",
     "layer",
     "anchors",
@@ -67,7 +66,6 @@ impl UiBuilder {
     }
 
     pub fn get_widget_by_id(&self, id: &str) -> Option<Widget> {
-
         let widget = self.widgets_by_id.borrow().get(id).cloned();
 
         widget
@@ -253,4 +251,3 @@ impl UiBuilder {
         }
     }
 }
-

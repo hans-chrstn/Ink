@@ -6,6 +6,7 @@ use std::process::Command;
 use std::thread;
 
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug)]
 pub enum StdLibError {
@@ -306,4 +307,8 @@ impl PangoConverter {
     fn into_string(self) -> String {
         self.output.trim().to_string()
     }
+}
+
+pub fn graphemes(s: &str) -> Vec<String> {
+    s.graphemes(true).map(|s| s.to_string()).collect()
 }

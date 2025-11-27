@@ -19,7 +19,7 @@ mlua = { version = "0.11.4", features = ["lua54", "vendored", "serialize", "asyn
 clap = { version = "4.0", features = ["derive"] }
 once_cell = "1.18"
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.12.24", features = ["blocking", "json", "rustls-tls"] } 
+reqwest = { version = "0.12.24", features = ["blocking", "json", "native-tls"], default-features = false }
 libpulse-binding = "2.30.1"
 md5 = "0.8.0"
 serde_json = "1.0.145"
@@ -28,4 +28,5 @@ image = "0.25.1"
 zbus = "5.12.0"
 tera = "1"
 include_dir = "0.7.4"
+unicode-segmentation = "1.12.0"
 
