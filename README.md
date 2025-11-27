@@ -2,6 +2,10 @@
 
 Ink is a GTK4 Layer Shell framework that is scriptable in Lua. It allows you to create custom desktop widgets and applications using Lua scripts to define the UI structure, behavior, and styling.
 
+# Disclaimer
+
+This is still in an early phase. You may encounter several bugs. You are free to make an Issue or a PR.
+
 ## Features
 
 - **GTK4 Layer Shell:** Create desktop widgets that integrate seamlessly with your desktop environment.
@@ -78,6 +82,35 @@ A widget definition is a table with the following properties:
 - `children`: (Optional) An array of child widget definitions.
 - `signals`: (Optional) A table of signal handlers for the widget.
 
+### Widget Methods
+
+Widgets returned by `app.get_widget_by_id(id)` or `build_ui(config)` have the following methods available:
+
+- `destroy()`: Destroys the widget.
+- `get_ancestor(gtype)`: Gets the first ancestor of a given GType.
+- `find_child(name)`: Finds a child widget by its name.
+- `set_text(text)`: Sets the text of a label or editable widget.
+- `insert_text(text)`: Inserts text at the current cursor position in an editable widget.
+- `set_visible(visible)`: Sets the visibility of the widget.
+- `is_visible()`: Gets the visibility of the widget.
+- `add_class(class)`: Adds a CSS class to the widget.
+- `remove_class(class)`: Removes a CSS class from the widget.
+- `remove_children()`: Removes all children from the widget.
+- `grab_focus()`: Grabs focus for the widget.
+- `get_text()`: Gets the text of an editable widget.
+- `get_value()`: Gets the value of a range or progress bar.
+- `set_value(value)`: Sets the value of a range or progress bar.
+- `set_range(min, max)`: Sets the range of a range widget.
+- `set_increments(step, page)`: Sets the increments of a range widget.
+- `get_parent()`: Gets the parent of the widget.
+- `queue_draw()`: Queues a redraw for the widget.
+- `get_vadjustment()`: Gets the vertical adjustment of a scrolled window.
+- `add_controller_motion(on_enter, on_leave)`: Adds a motion controller to the widget.
+- `add(child, props)`: Adds a child widget.
+- `set_property(key, value)`: Sets a property on the widget.
+- `get_property(key)`: Gets a property from the widget.
+- `connect_signal(signal_name, func)`: Connects a signal handler to the widget.
+
 ### Globals
 
 The following global functions and tables are available in the Lua environment:
@@ -89,6 +122,7 @@ The following global functions and tables are available in the Lua environment:
 - `app.windows`: A table of all the windows created by the application, indexed by their titles.
 - `app.on_ready`: A function that is called after the UI is built.
 - `app.markdown_to_pango(markdown)`: Converts a Markdown string to a Pango markup string.
+- `app.on_notification(notification)`: A function that is called when a notification is received. The `notification` argument is a table containing the notification data (`app_name`, `summary`, `body`, `timeout`).
 - `app.tray`: A table for managing the system tray. See the `Tray API` section for more details.
 
 #### `Clipboard` table
@@ -114,50 +148,129 @@ The following global functions and tables are available in the Lua environment:
 
 Ink provides a number of services that can be accessed from your Lua scripts.
 
-#### `apps` service
+#### `Apps` service
 
-- `app.apps.get_desktop_actions(desktop_file_id)`: Returns a list of desktop actions for the specified desktop file.
-- `app.apps.launch_desktop_action(desktop_file_id, action_name)`: Launches a desktop action.
-- `app.apps.get_app_info(desktop_file_id)`: Returns information about the specified application.
-- `app.apps.get_all_apps()`: Returns a list of all installed applications.
+- `Apps.list()`: Returns a list of all installed applications. Each application object has the following fields and methods:
+  - `name`: The display name of the application.
+  - `executable`: The path to the application's executable.
+  - `icon`: The name of the application's icon.
+  - `launch()`: A method to launch the application.
 
-#### `audio` service
+#### `Audio` service
 
-- `app.audio.get_sinks()`: Returns a list of audio sinks.
-- `app.audio.get_sources()`: Returns a list of audio sources.
-- `app.audio.set_sink_volume(sink_id, volume)`: Sets the volume of the specified sink.
-- `app.audio.set_source_volume(source_id, volume)`: Sets the volume of the specified source.
-- `app.audio.set_sink_mute(sink_id, mute)`: Mutes or unmutes the specified sink.
-- `app.audio.set_source_mute(source_id, mute)`: Mutes or unmutes the specified source.
-- `app.audio.get_default_sink()`: Returns the default audio sink.
-- `app.audio.get_default_source()`: Returns the default audio source.
-
-#### `dbus` service
-
-- `app.dbus.call(bus, dest, path, interface, member, body)`: Calls a D-Bus method.
+- `Audio.get_volume()`: An asynchronous function that returns the current volume percentage of the default sink.
+- `Audio.set_volume(percent)`: An asynchronous function that sets the volume of the default sink to the specified percentage.
+- `Audio.watch(callback)`: A function that watches for volume changes and calls the `callback` function when a change is detected.
 
 #### `fs` service
 
-- `app.fs.read_file(path)`: Reads the contents of a file.
-- `app.fs.write_file(path, content)`: Writes content to a file.
-- `app.fs.watch_file(path, callback)`: Watches a file for changes and calls the `callback` function when the file is modified.
+- `Files.read_file(path)`: Reads the contents of a file.
+- `Files.write_file(path, content)`: Writes content to a file.
+- `Files.exists(path)`: Checks if a file or directory exists.
+- `Files.watch(path, callback)`: Watches a file for changes and calls the `callback` function when the file is modified. Returns a watcher object with a `disconnect()` method.
 
 #### `json` service
 
 - `app.json.parse(json)`: Parses a JSON string and returns a Lua table.
 - `app.json.stringify(table)`: Converts a Lua table to a JSON string.
 
-#### `system` service
+#### `System` service
 
-- `app.system.get_env(name)`: Returns the value of an environment variable.
-- `app.system.get_hostname()`: Returns the system hostname.
-- `app.system.get_user()`: Returns the current user.
-- `app.system.get_uptime()`: Returns the system uptime.
+- `System.get_battery()`: Returns a table with `capacity` and `status` of the battery.
+- `System.get_wifi_ssid()`: An asynchronous function that returns the current Wi-Fi SSID.
+- `System.set_clipboard(text)`: An asynchronous function that sets the clipboard text.
+- `System.media_info()`: An asynchronous function that returns a table with `title` and `artist` of the currently playing media.
 
 #### `tray` service
 
-- `app.tray.set_icon(icon_path)`: Sets the system tray icon.
-- `app.tray.set_menu(menu_table)`: Sets the system tray menu.
+- `app.tray.get_item_properties(service)`: Returns a table of processed properties for the specified tray item.
+- `app.tray.get_item_raw_properties(service)`: Returns a table of raw properties for the specified tray item.
+- `app.tray.on_item_added(service)`: A function that is called when a new system tray item is registered. The `service` argument is the name of the new tray item's service.
+
+### LuaAdjustment Object
+
+The `LuaAdjustment` object is returned by `widget:get_vadjustment()`. It has the following methods:
+
+- `get_value()`: Gets the value of the adjustment.
+- `set_value(value)`: Sets the value of the adjustment.
+- `get_upper()`: Gets the upper value of the adjustment.
+
+## Available Gtk Widget Types
+
+Most of these are untested. You are free to make a PR if you encounter any issues.
+I may not be able to update this tab from time to time, so just checkout the file at `src/ui/catalog.rs`.
+
+### Containers
+
+- `GtkWindow`
+- `GtkApplicationWindow`
+- `GtkDialog`
+- `GtkAboutDialog`
+- `GtkMessageDialog`
+- `GtkColorChooserDialog`
+- `GtkFileChooserDialog`
+- `GtkFontChooserDialog`
+- `GtkAppChooserDialog`
+- `GtkBox`
+- `GtkCenterBox`
+- `GtkListBox`
+- `GtkFlowBox`
+- `GtkStack`
+- `GtkOverlay`
+- `GtkPaned`
+- `GtkExpander`
+- `GtkRevealer`
+- `GtkScrolledWindow`
+- `GtkViewport`
+- `GtkActionBar`
+- `GtkHeaderBar`
+- `GtkNotebook`
+- `GtkFrame`
+- `GtkAspectFrame`
+- `GtkWindowHandle`
+- `GtkPopover`
+- `GtkButton`
+- `GtkToggleButton`
+- `GtkLinkButton`
+- `GtkMenuButton`
+- `GtkCheckButton`
+
+### Leaf Widgets
+
+- `GtkLabel`
+- `GtkImage`
+- `GtkPicture`
+- `GtkSpinner`
+- `GtkProgressBar`
+- `GtkLevelBar`
+- `GtkCalendar`
+- `GtkVideo`
+- `GtkSeparator`
+- `GtkStatusbar`
+- `GtkInfoBar`
+- `GtkEntry`
+- `GtkPasswordEntry`
+- `GtkSearchEntry`
+- `GtkSpinButton`
+- `GtkSwitch`
+- `GtkScale`
+- `GtkRange`
+- `GtkTextView`
+- `GtkColorButton`
+- `GtkFontButton`
+- `GtkDropDown`
+- `GtkComboBox`
+- `GtkComboBoxText`
+- `GtkListView`
+- `GtkGridView`
+- `GtkColumnView`
+- `GtkDrawingArea`
+- `GtkGLArea`
+- `GtkEmojiChooser`
+- `GtkShortcutsShortcut`
+- `GtkLockButton`
+- `GtkPopoverMenu`
+- `GtkPopoverMenuBar`
 
 ## Examples
 
@@ -171,3 +284,6 @@ Ink provides a number of services that can be accessed from your Lua scripts.
 
 There are several more in the `examples/` directory
 
+## Additional Notes
+
+Error handling is inconsistent. You might find cases where it misses an error it should have caught.
