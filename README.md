@@ -30,14 +30,14 @@ To create a default configuration file, run the `init` command:
 ./target/release/ink init
 ```
 
-This will create an `ink.lua` file in `~/.config/ink/`.
+This will create an `init.lua` file in `~/.config/ink/`.
 
 ### Running the Application
 
 To run the application, you need to provide a Lua configuration file:
 
 ```bash
-./target/release/ink path/to/your/config.lua
+./target/release/ink path/to/your/init.lua
 ```
 
 If you don't provide a file, Ink will look for a default configuration at `~/.config/ink/init.lua`.
